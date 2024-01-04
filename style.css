@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+#awesomebar-container {
+  width: 80%;
+  margin: 0 auto;
+  height: 3.5em;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  /* add a shadow that gives it a 3d effect */
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
+}
+
+#awesomebar {
+  margin-left: 1ex;
+  border: solid 1px #999;
+  border-radius: 5px;
+  padding: 7px;
+  min-width: 70%;
+  background-color: rgba(255,255,255,0.5);
+}
+
+#awesomebar:active {
+  border: none;
+}
+
+#awesomebar-title {
+  font-style:oblique;
+}
