@@ -166,6 +166,8 @@ view model =
 
 type EventInputType
   = InsertText Int -- offset position of caret
+  | DeleteBackwards
+  | DeleteForwards
   | Disallow
 
 classifyInput : String -> String -> EventInputType
@@ -174,7 +176,7 @@ classifyInput inputType data =
     "insertText" ->
       InsertText (String.length data)
     "insertReplacementText" ->
-      Disallow
+      InsertText (String.length data)
     "insertLineBreak" ->
       Disallow
     "insertParagraph" ->
@@ -190,7 +192,7 @@ classifyInput inputType data =
     "insertFromDrop" ->
       Disallow
     "insertFromPaste" ->
-      Disallow
+      InsertText (String.length data)
     "insertFromPasteAsQuotation" ->
       Disallow
     "insertTranspose" ->
@@ -216,13 +218,13 @@ classifyInput inputType data =
     "deleteByDrag" ->
       Disallow
     "deleteByCut" ->
-      Disallow
+      DeleteBackwards
     "deleteContent" ->
-      Disallow
+      DeleteBackwards
     "deleteContentBackward" ->
-      Disallow
+      DeleteBackwards
     "deleteContentForward" ->
-      Disallow
+      DeleteForwards
     "historyUndo" ->
       Disallow
     "historyRedo" ->
@@ -281,6 +283,18 @@ decodeInput model state =
             right = {-Debug.log "Suffix" <|-} String.dropLeft end state.s
           in
             AB (SetString (left ++ data ++ right) (start + added))
+        DeleteBackwards ->
+          if start == 0 && end == start then
+            NoOp
+          else if start == end then
+            AB (SetString (String.left (start - 1) state.s ++ String.dropLeft end state.s) (start - 1))
+          else
+            AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
+        DeleteForwards ->
+          if start == end then
+            AB (SetString (String.left start state.s ++ String.dropLeft (end + 1) state.s) start)
+          else
+            AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
     )
     (D.field "inputType" D.string)
     (D.field "data" D.string)

@@ -3,6 +3,7 @@
 - https://stackoverflow.com/a/41034697
 - https://gist.github.com/jh3y/6c066cea00216e3ac860d905733e65c7#file-getcursorxy-js
 - https://github.com/konstantinmuenster/notion-clone/commit/4c7193418e4bec03cd250293304b962265367557
+- https://www.w3.org/TR/edit-context/
 
 …as well as the usual MDN etc documentation.
 */
@@ -35,20 +36,6 @@ function createRange(node, chars, range) {
     }
   }
   return range;
-};
-
-function setCurrentCursorPosition(chars) {
-  if (chars >= 0) {
-    var selection = window.getSelection();
-
-    range = createRange(document.getElementById("awesomebar").parentNode, { count: chars });
-
-    if (range) {
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-  }
 };
 
 function isChildOf(node, parentId) {
@@ -129,22 +116,6 @@ function beforeInputListener(event) {
     lastInputEvent = event;
     return; // let the composition continue; come back when it's done.
   }
-  const bar = document.getElementById("awesomebar");
-  // Here I need to get the selection position as well.
-  // If we're in 'beforeinput', then we can assume focus??
-  // I'm not 100% sure, but I don't see how it can be false
-  // (barring programmatic input), so the temptation is to go with it…
-  // But hey, what can I say, I'm a safety girl!
-  bar.focus();
-  const sel = document.getSelection();
-  const range = sel.getRangeAt(0);
-  const clone_range = range.cloneRange();
-  clone_range.selectNodeContents(bar);
-  clone_range.setEnd(range.startContainer, range.startOffset);
-  const start = clone_range.toString().length;
-  const end = start + range.toString().length;
-  console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
-  // unless there is an ACTUAL selection, `start` and `end` should be the same.
   if (event.inputType.match("^(insert|delete).*")) {
     // I have to `preventDefault` here because Elm won't handle the actual event.
     // That is because the actual event doesn't contain caret position;
@@ -153,15 +124,46 @@ function beforeInputListener(event) {
     // It will be notified about its characteristics instead.
     event.preventDefault();
   }
-  // Now tell Elm about it.
   console.log(event);
-  app.ports.awesomeBarInput.send(
-    {
-      inputType: event.inputType
-      , data: event.data ?? ""
-      , start: start
-      , end: end
-    });
+  if (event.inputType === "insertReplacementText") {
+    const replacement = event.dataTransfer.getData("text");
+    const range = event.getTargetRanges()[0];
+    // Now tell Elm about it.
+    console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
+    app.ports.awesomeBarInput.send(
+      {
+        inputType: event.inputType
+        , data: replacement
+        , start: range.startOffset
+        , end: range.endOffset
+      });
+  } else {
+    const bar = document.getElementById("awesomebar");
+    // Here I need to get the selection position as well.
+    // If we're in 'beforeinput', then we can assume focus??
+    // I'm not 100% sure, but I don't see how it can be false
+    // (barring programmatic input), so the temptation is to go with it…
+    // But hey, what can I say, I'm a safety girl!
+    // bar.focus();
+    const range = window.getSelection().getRangeAt(0);
+    const preSelectionRange = range.cloneRange();
+    preSelectionRange.selectNodeContents(bar);
+    preSelectionRange.setEnd(range.startContainer, range.startOffset);
+    const start = preSelectionRange.toString().length;
+    const end = start + range.toString().length;
+    // unless there is an ACTUAL selection, `start` and `end` should be the same.
+    // Now tell Elm about it.
+    console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
+    app.ports.awesomeBarInput.send(
+      {
+        inputType: event.inputType
+        , data: event.inputType === "insertFromPaste"
+            ? event.dataTransfer.getData("text")
+            : event.data ?? ""
+        , start: start
+        , end: end
+      });
+    }
 }
 function goodbyeBar() {
   const bar = document.getElementById("awesomebar");
@@ -194,27 +196,41 @@ function textNodeIn(node) {
   return Array.from(node.childNodes).find(textNodeIn);
 }
 
-function setCaretPosition(pos) {
+function setCaretPosition(pos, bar) {
   // This is called AFTER text-changes have been made.
   // "pos" gives the position in characters from the start.
   // First, let's get the container that contains the text.
-  const bar = document.getElementById("awesomebar");
-  if (!bar) {
-    return;
-  }
   console.log(`Setting caret position to ${pos}, for '${bar.innerText}'`);
   let s = document.getSelection();
   let r = document.createRange();
   let textNode = textNodeIn(s.focusNode);
   caretPosition = pos; // should I do this? 🤔
   if (textNode) {
-    r.setStart(textNode, pos);
-    r.collapse(true);
-    s.removeAllRanges();
-    s.addRange(r);
+    count = 0;
+    let execute = function() {
+      try {
+        r.setStart(textNode, pos);
+        r.collapse(true);
+        s.removeAllRanges();
+        s.addRange(r);
+      } catch (e) {
+        console.log(e);
+        if (count < 5) {
+          count++;
+          setTimeout(execute, 5); // the system must be under some stress…?
+        }
+      }
+    };
+    execute();
   }
 };
-app.ports.shiftCaret.subscribe((p) => setTimeout(() => setCaretPosition(p), 0));
+app.ports.shiftCaret.subscribe((p) => {
+  const bar = document.getElementById("awesomebar");
+  if (!bar) {
+    return;
+  }
+  setTimeout(() => setCaretPosition(p, bar), 0)
+});
 // app.ports.saveToStorage.subscribe(function(state) {
 //   localStorage.setItem("state", state);
 //   console.log(JSON.parse(state));
