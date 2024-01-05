@@ -8,111 +8,87 @@
 …as well as the usual MDN etc documentation.
 */
 
-function createRange(node, chars, range) {
-  if (!range) {
-    range = document.createRange()
-    range.selectNode(node);
-    range.setStart(node, 0);
-  }
+/*
+What problem am I leaving open?
 
-  if (chars.count === 0) {
-    range.setEnd(node, chars.count);
-  } else if (node && chars.count > 0) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (node.textContent.length < chars.count) {
-        chars.count -= node.textContent.length;
-      } else {
-        range.setEnd(node, chars.count);
-        chars.count = 0;
-      }
-    } else {
-      for (var lp = 0; lp < node.childNodes.length; lp++) {
-        range = createRange(node.childNodes[lp], chars, range);
+The cursor seems to skip back to the start of the input after every keypress.
+So when input comes in too fast (e.g., backspace held down), the key suddenly
+"stops working" at the right place and the cursor is teleported to the very
+start of the contenteditable.
 
-        if (chars.count === 0) {
-          break;
-        }
-      }
-    }
-  }
-  return range;
-};
+1. WHY is it teleported to the start in the first place?? Can this just be stopped?
 
-function isChildOf(node, parentId) {
-  if (node === null) return false;
-  return node.id === parentId || isChildOf(node.parentNode, parentId);
-}
+All the way until the end of the `beforeinput` event, there's no issue.
+The event completes correctly.  However, at the start of `setCaretPosition`,
+the caret position is suddenly 0.
 
-function getCurrentCursorPosition(parentId) {
-  var selection = window.getSelection(),
-    charCount = -1,
-    node;
+Between the two of these, this happens:
+  1. The `awesomeBarInput` functionality is invoked.  This happens immediately,
+     as a function call.  All good.
+  2. `shiftCaret` is called (call to JS from Elm).  All good.
+  3. `setCaretPosition` is deferred; it's called with `setTimeout`.  All good.
+  4. View function is called and DOM is diffed/updated.  Caret position set to 0,
+     and this does not appear to be under my control (it's an Elm-ism, I think).
+  5. `setCaretPosition`, which was deferred, is called and the caret position is
+     updated.
 
-  if (selection.focusNode) {
-    if (isChildOf(selection.focusNode, parentId)) {
-      node = selection.focusNode;
-      charCount = selection.focusOffset;
+Between (4) and (5), the user has the opportunity to input data at the INCORRECT
+position (i.e. 0).
 
-      while (node) {
-        if (node.id === parentId) {
-          break;
-        }
+2. If not, can I at least detect it and/or correct it?
 
-        if (node.previousSibling) {
-          node = node.previousSibling;
-          charCount += node.textContent.length;
-        } else {
-          node = node.parentNode;
-          if (node === null) {
-            break
-          }
-        }
-      }
-    }
-  }
+Yes.  I've changed the design:
 
-  return charCount;
-};
+  1. The `awesomeBarInput` functionality is invoked.  This happens immediately,
+     as a function call.  All good.
+
+     NOTE: this might OR MIGHT NOT continue on to (2) etc. `NoOp` might result in
+     nothing else being done.
+
+  2. `shiftCaret` is called (call to JS from Elm).  It assigns the correct caret
+     position to `caretPosition`.
+  3. View function is called and DOM is diffed/updated.  Caret position set to 0,
+     and this does not appear to be under my control (it's an Elm-ism, I think).
+  4. A mutation observer (set up during initialization of awesomebar) picks up the
+     DOM change as soon as it happens, and calls `setCaretPosition`, which uses the
+     `caretPosition` sent through in (2).
+
+There is much less time taken between (3) and (4), so to the user, the caret
+position seems to always be correct.
+*/
+
+caretPosition = 0; // this is set via the `shiftCaret` port
+isComposing = false;
+lastInputEvent = null;
+bar = null;
+textRange = null;
 
 let app = Elm.Main.init({
   node: document.getElementById('myapp'),
   flags: null
 });
 
-caretPosition = 0;
-
 document.addEventListener("keyup",
-  (e) => {
-    caretPosition = getCurrentCursorPosition("awesomebar");
-    console.log(`KeyUp TRACKING: Caret position=${getCurrentCursorPosition("awesomebar")}`);
-    if (e.key === "Escape") {
-      console.log("ESCAPE");
-      app.ports.sendEscape.send(null); // "Escape" can mean many things. Let Elm interpret it.
-    }
-  });
-
-document.addEventListener("mouseup", (e) =>
-  {
-    if (e.target.id === "awesomebar" || e.target.parentNode.id === "awesomebar") {
-      caretPosition = getCurrentCursorPosition("awesomebar");
-      console.log(`MouseUp TRACKING: Caret position=${getCurrentCursorPosition("awesomebar")}`)
-    }
-    // else console.log(e.target);
+(e) => {
+  if (e.key === "Escape") {
+    // console.log("ESCAPE");
+    app.ports.sendEscape.send(null); // "Escape" can mean many things. Let Elm interpret it.
   }
-);
-isComposing = false;
-lastInputEvent = null;
+});
+
 function trackCompositionStart(e) {
   isComposing = true;
 }
+
 function trackCompositionEnd(e) {
   isComposing = false;
   beforeInputListener(lastInputEvent);
   lastInputEvent = null;
 }
+
 function beforeInputListener(event) {
   if (isComposing) {
-    console.log(`Got ${event.inputType} but still composing.`);
+    // console.log(`Got ${event.inputType} but still composing.`);
     lastInputEvent = event;
     return; // let the composition continue; come back when it's done.
   }
@@ -124,12 +100,12 @@ function beforeInputListener(event) {
     // It will be notified about its characteristics instead.
     event.preventDefault();
   }
-  console.log(event);
+  // console.log(event);
   if (event.inputType === "insertReplacementText") {
     const replacement = event.dataTransfer.getData("text");
     const range = event.getTargetRanges()[0];
     // Now tell Elm about it.
-    console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
+    // console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
     app.ports.awesomeBarInput.send(
       {
         inputType: event.inputType
@@ -137,46 +113,84 @@ function beforeInputListener(event) {
         , start: range.startOffset
         , end: range.endOffset
       });
-  } else {
-    const bar = document.getElementById("awesomebar");
-    // Here I need to get the selection position as well.
-    // If we're in 'beforeinput', then we can assume focus??
-    // I'm not 100% sure, but I don't see how it can be false
-    // (barring programmatic input), so the temptation is to go with it…
-    // But hey, what can I say, I'm a safety girl!
-    // bar.focus();
-    const range = window.getSelection().getRangeAt(0);
-    const preSelectionRange = range.cloneRange();
-    preSelectionRange.selectNodeContents(bar);
-    preSelectionRange.setEnd(range.startContainer, range.startOffset);
-    const start = preSelectionRange.toString().length;
-    const end = start + range.toString().length;
-    // unless there is an ACTUAL selection, `start` and `end` should be the same.
-    // Now tell Elm about it.
-    console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
-    app.ports.awesomeBarInput.send(
-      {
-        inputType: event.inputType
-        , data: event.inputType === "insertFromPaste"
-            ? event.dataTransfer.getData("text")
-            : event.data ?? ""
-        , start: start
-        , end: end
-      });
+    } else {
+      // Here I need to get the selection position as well.
+      // If we're in 'beforeinput', then we can assume focus??
+      // I'm not 100% sure, but I don't see how it can be false
+      // (barring programmatic input), so the temptation is to go with it…
+      // But hey, what can I say, I'm a safety girl!
+      // bar.focus();
+      const range = window.getSelection().getRangeAt(0);
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(bar);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const start = preSelectionRange.toString().length;
+      const end = start + range.toString().length;
+      // unless there is an ACTUAL selection, `start` and `end` should be the same.
+      // Now tell Elm about it.
+      // console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
+      app.ports.awesomeBarInput.send(
+        {
+          inputType: event.inputType
+          , data: event.inputType === "insertFromPaste"
+              ? event.dataTransfer.getData("text")
+              : event.data ?? ""
+          , start: start
+          , end: end
+        });
     }
 }
-function goodbyeBar() {
-  const bar = document.getElementById("awesomebar");
-  if (!bar) {
-    return;
+
+function setCaretPosition(textNode) {
+  // This is called AFTER text-changes have been made.
+  if (textRange == null) {
+    let s = document.getSelection();
+    textRange = document.createRange();
+    textRange.setStart(textNode, caretPosition);
+    textRange.collapse(true);
+    s.removeAllRanges();
+    s.addRange(textRange);
+  } else {
+    textRange.setStart(textNode, Math.min(caretPosition, textNode.data.length));
+    textRange.collapse(true);
   }
+};
+
+// Callback function to execute when mutations are observed
+const observation = (mutationList, _observer) => {
+  for (const mutation of mutationList) {
+    // console.log(mutation);
+    const arr = Array.from(mutation.addedNodes);
+    if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
+      // console.log(`A child node has been added or removed within ${mutation.target.id}`);
+      // console.log(mutation.removedNodes);
+      // console.log(mutation.addedNodes);
+      setCaretPosition(mutation.addedNodes[0]);
+      return;
+    }
+  }
+};
+
+// Create an observer instance linked to the callback function
+const observer = new MutationObserver(observation);
+
+function goodbyeBar() {
   bar.removeEventListener("beforeinput", beforeInputListener);
   bar.removeEventListener("compositionstart", trackCompositionStart);
   bar.removeEventListener("compositionend", trackCompositionEnd);
-  app.ports.listenerRemoved.send(null); // Tell Elm that it can now get rid of the element
+  observer.disconnect();
+  // reset all the state-tracking variables
+  textRange = null;
+  bar = null;
+  isComposing = false;
+  caretPosition = 0;
+  lastInputEvent = null;
+  // Tell Elm that it can now get rid of the element
+  app.ports.listenerRemoved.send(null);
 }
+
 function initializeBar() {
-  const bar = document.getElementById("awesomebar");
+  bar = document.getElementById("awesomebar");
   if (!bar) {
     setTimeout(initializeBar, 50);
     return;
@@ -185,56 +199,15 @@ function initializeBar() {
   bar.addEventListener("compositionstart", trackCompositionStart);
   bar.addEventListener("compositionend", trackCompositionEnd);
   bar.focus();
+
+  // Start observing the target node for configured mutations
+  observer.observe(bar, { characterData: true, childList: true, subtree: false });
+
 }
+
 app.ports.displayAwesomeBar.subscribe(initializeBar);
 app.ports.hideAwesomeBar.subscribe(goodbyeBar);
 
-function textNodeIn(node) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node;
-  }
-  return Array.from(node.childNodes).find(textNodeIn);
-}
-
-function setCaretPosition(pos, bar) {
-  // This is called AFTER text-changes have been made.
-  // "pos" gives the position in characters from the start.
-  // First, let's get the container that contains the text.
-  console.log(`Setting caret position to ${pos}, for '${bar.innerText}'`);
-  let s = document.getSelection();
-  let r = document.createRange();
-  let textNode = textNodeIn(s.focusNode);
-  caretPosition = pos; // should I do this? 🤔
-  if (textNode) {
-    count = 0;
-    let execute = function() {
-      try {
-        r.setStart(textNode, pos);
-        r.collapse(true);
-        s.removeAllRanges();
-        s.addRange(r);
-      } catch (e) {
-        console.log(e);
-        if (count < 5) {
-          count++;
-          setTimeout(execute, 5); // the system must be under some stress…?
-        }
-      }
-    };
-    execute();
-  }
-};
 app.ports.shiftCaret.subscribe((p) => {
-  const bar = document.getElementById("awesomebar");
-  if (!bar) {
-    return;
-  }
-  setTimeout(() => setCaretPosition(p, bar), 0)
+  caretPosition = p;
 });
-// app.ports.saveToStorage.subscribe(function(state) {
-//   localStorage.setItem("state", state);
-//   console.log(JSON.parse(state));
-// });
-// app.ports.loadResult.subscribe(function(result) {
-//   window.alert(result);
-// });

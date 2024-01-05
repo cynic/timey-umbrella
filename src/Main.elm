@@ -14,6 +14,7 @@ import Html.Events exposing (on, preventDefaultOn)
 import Platform.Cmd as Cmd
 import String.Extra as String
 import Ports
+import Html.Keyed as Keyed
 
 -- MODEL
 
@@ -128,7 +129,9 @@ update msg model =
           Escape ->
             (model, Ports.hideAwesomeBar ())
           SetString s i ->
-            ({ model | mode = AwesomeBar { x | s = s, i = i } }, Ports.shiftCaret i)
+            ({ model | mode = AwesomeBar { x | s = s, i = i } }
+            , Ports.shiftCaret i
+            )
       Waiting ->
         (model, Cmd.none)
 
@@ -139,26 +142,25 @@ view : Model -> Browser.Document Msg
 view model =
   { title = "Hello, Elm!"
   , body =
-  [ div []
-    [ text "Hello, Elm!" ]
-  , case model.mode of
-    Waiting ->
-      div [] [ text "Waiting…" ]
-    AwesomeBar state ->
-      div
-      [ id "awesomebar-container" ]
-      [ div
-        [ id "awesomebar-title" ]
-        [ text "Task" ]
-      , div
-        [ contenteditable True
-        , id "awesomebar"
-        -- , preventDefaultOn "beforeinput" (decodeInput model state)
-        ]
-        [ text <| Debug.log "Generating TEXT node" state.s
-        ]
-      ]
-  ]
+    [ div []
+      [ text "Hello, Elm!" ]
+    , case model.mode of
+      Waiting ->
+        div [] [ text "Waiting…" ]
+      AwesomeBar state ->
+        Keyed.node "div"
+          [ id "awesomebar-container" ]
+          [ ("title", div
+            [ id "awesomebar-title" ]
+            [ text "Task" ])
+          , ("bar", Keyed.node "div"
+            [ contenteditable True
+            , id "awesomebar"
+            ]
+            [ (state.s, text <| {-Debug.log "Generating TEXT node"-} state.s)
+            ])
+          ]
+    ]
   }
 
 
@@ -172,7 +174,7 @@ type EventInputType
 
 classifyInput : String -> String -> EventInputType
 classifyInput inputType data =
-  case Debug.log "inputType" inputType of
+  case {-Debug.log "inputType"-} inputType of
     "insertText" ->
       InsertText (String.length data)
     "insertReplacementText" ->
