@@ -179,46 +179,8 @@ classifyInput inputType data =
       InsertText (String.length data)
     "insertReplacementText" ->
       InsertText (String.length data)
-    "insertLineBreak" ->
-      Disallow
-    "insertParagraph" ->
-      Disallow
-    "insertOrderedList" ->
-      Disallow
-    "insertUnorderedList" ->
-      Disallow
-    "insertHorizontalRule" ->
-      Disallow
-    "insertFromYank" ->
-      Disallow
-    "insertFromDrop" ->
-      Disallow
     "insertFromPaste" ->
       InsertText (String.length data)
-    "insertFromPasteAsQuotation" ->
-      Disallow
-    "insertTranspose" ->
-      Disallow
-    "insertCompositionText" ->
-      InsertText 0
-    "insertLink" ->
-      Disallow
-    "deleteWordBackward" ->
-      Disallow
-    "deleteWordForward" ->
-      Disallow
-    "deleteSoftLineBackward" ->
-      Disallow
-    "deleteSoftLineForward" ->
-      Disallow
-    "deleteEntireSoftLine" ->
-      Disallow
-    "deleteHardLineBackward" ->
-      Disallow
-    "deleteHardLineForward" ->
-      Disallow
-    "deleteByDrag" ->
-      Disallow
     "deleteByCut" ->
       DeleteBackwards
     "deleteContent" ->
@@ -227,48 +189,86 @@ classifyInput inputType data =
       DeleteBackwards
     "deleteContentForward" ->
       DeleteForwards
-    "historyUndo" ->
-      Disallow
-    "historyRedo" ->
-      Disallow
-    "formatBold" ->
-      Disallow
-    "formatItalic" ->
-      Disallow
-    "formatUnderline" ->
-      Disallow
-    "formatStrikeThrough" ->
-      Disallow
-    "formatSuperscript" ->
-      Disallow
-    "formatSubscript" ->
-      Disallow
-    "formatJustifyFull" ->
-      Disallow
-    "formatJustifyCenter" ->
-      Disallow
-    "formatJustifyRight" ->
-      Disallow
-    "formatJustifyLeft" ->
-      Disallow
-    "formatIndent" ->
-      Disallow
-    "formatOutdent" ->
-      Disallow
-    "formatRemove" ->
-      Disallow
-    "formatSetBlockTextDirection" ->
-      Disallow
-    "formatSetInlineTextDirection" ->
-      Disallow
-    "formatBackColor" ->
-      Disallow
-    "formatFontColor" ->
-      Disallow
-    "formatFontName" ->
-      Disallow
+    "insertCompositionText" ->
+      InsertText 0
+    -- "insertLineBreak" ->
+    --   Disallow
+    -- "insertParagraph" ->
+    --   Disallow
+    -- "insertOrderedList" ->
+    --   Disallow
+    -- "insertUnorderedList" ->
+    --   Disallow
+    -- "insertHorizontalRule" ->
+    --   Disallow
+    -- "insertFromYank" ->
+    --   Disallow
+    -- "insertFromDrop" ->
+    --   Disallow
+    -- "insertFromPasteAsQuotation" ->
+    --   Disallow
+    -- "insertTranspose" ->
+    --   Disallow
+    -- "insertLink" ->
+    --   Disallow
+    -- "deleteWordBackward" ->
+    --   Disallow
+    -- "deleteWordForward" ->
+    --   Disallow
+    -- "deleteSoftLineBackward" ->
+    --   Disallow
+    -- "deleteSoftLineForward" ->
+    --   Disallow
+    -- "deleteEntireSoftLine" ->
+    --   Disallow
+    -- "deleteHardLineBackward" ->
+    --   Disallow
+    -- "deleteHardLineForward" ->
+    --   Disallow
+    -- "deleteByDrag" ->
+    --   Disallow
+    -- "historyUndo" ->
+    --   Disallow
+    -- "historyRedo" ->
+    --   Disallow
+    -- "formatBold" ->
+    --   Disallow
+    -- "formatItalic" ->
+    --   Disallow
+    -- "formatUnderline" ->
+    --   Disallow
+    -- "formatStrikeThrough" ->
+    --   Disallow
+    -- "formatSuperscript" ->
+    --   Disallow
+    -- "formatSubscript" ->
+    --   Disallow
+    -- "formatJustifyFull" ->
+    --   Disallow
+    -- "formatJustifyCenter" ->
+    --   Disallow
+    -- "formatJustifyRight" ->
+    --   Disallow
+    -- "formatJustifyLeft" ->
+    --   Disallow
+    -- "formatIndent" ->
+    --   Disallow
+    -- "formatOutdent" ->
+    --   Disallow
+    -- "formatRemove" ->
+    --   Disallow
+    -- "formatSetBlockTextDirection" ->
+    --   Disallow
+    -- "formatSetInlineTextDirection" ->
+    --   Disallow
+    -- "formatBackColor" ->
+    --   Disallow
+    -- "formatFontColor" ->
+    --   Disallow
+    -- "formatFontName" ->
+    --   Disallow
     x -> -- this should never happen.
-      Debug.log "Invalid inputType seen" x
+      Debug.log "Unhandled inputType seen" x
       |> \_ -> Disallow
 
 decodeInput : Model -> AwesomeBarState -> D.Decoder Msg
