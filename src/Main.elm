@@ -75,10 +75,15 @@ type Mode
   = Waiting
   | AwesomeBar AwesomeBarState
 
+type ABSpecialKey
+  = Escape
+  | Tab
+  | Enter
+
 type ABMsg
   = SetString String Int
   | ListenerRemoved
-  | Escape
+  | Key ABSpecialKey
 
 type Msg
   = NoOp
@@ -101,16 +106,6 @@ init _ _ key =
 
 
 -- UPDATE
-updateAB : ABMsg -> AwesomeBarState -> AwesomeBarState
-updateAB msg ab_state =
-  case msg of
-    SetString s i ->
-      { ab_state | s = s, i = i }
-    ListenerRemoved ->
-      Debug.log "Listener removed message received" ab_state
-    Escape ->
-      Debug.log "Escape-key received" ab_state
-
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
@@ -126,8 +121,12 @@ update msg model =
         case abmsg of
           ListenerRemoved ->
             ({ model | mode = Waiting }, Cmd.none)
-          Escape ->
+          Key Escape ->
             (model, Ports.hideAwesomeBar ())
+          Key Tab ->
+            (model, Cmd.none)
+          Key Enter ->
+            (model, Cmd.none)
           SetString s i ->
             ({ model | mode = AwesomeBar { x | s = s, i = i } }
             , Ports.shiftCaret i
@@ -157,7 +156,16 @@ view model =
             [ contenteditable True
             , id "awesomebar"
             ]
-            [ (state.s, text <| {-Debug.log "Generating TEXT node"-} state.s)
+            [ ( state.s
+              , div
+                  []
+                  [ text <| {-Debug.log "Generating TEXT node"-} state.s
+                  , span
+                      [ class "placeholder"
+                      , contenteditable False
+                      ]
+                      [ text "orrow" ]
+                  ])
             ])
           ]
     ]
@@ -308,6 +316,18 @@ decodeInput model state =
   --     (AB (SetString input), True)
   --   )
 
+decodeSpecialKey : String -> Msg
+decodeSpecialKey key =
+  case key of
+    "Escape" ->
+      AB <| Key Escape
+    "Tab" ->
+      AB <| Key Tab
+    "Enter" ->
+      AB <| Key Enter
+    _ ->
+      NoOp
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
   case model.mode of
@@ -324,7 +344,7 @@ subscriptions model =
       Sub.batch
         [ Ports.awesomeBarInput (D.decodeValue (decodeInput model state) >> Result.withDefault NoOp)
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
-        , Ports.sendEscape (\_ -> AB Escape)
+        , Ports.sendSpecial decodeSpecialKey
         ]
 
 -- PROGRAM

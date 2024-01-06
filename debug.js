@@ -68,13 +68,6 @@ function debugPos() {
   return getCurrentCursorPosition("awesomebar");
 }
 
-function textNodeIn(node) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node;
-  }
-  return Array.from(node.childNodes).find(textNodeIn);
-}
-
 function trackCaretPosition() {
   document.addEventListener("keyup",
     (e) => {

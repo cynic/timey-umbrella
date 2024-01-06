@@ -38,7 +38,7 @@ position (i.e. 0).
 2. If not, can I at least detect it and/or correct it?
 
 Yes.  I've changed the design:
-
+("bar", Keyed.node "
   1. The `awesomeBarInput` functionality is invoked.  This happens immediately,
      as a function call.  All good.
 
@@ -68,13 +68,14 @@ let app = Elm.Main.init({
   flags: null
 });
 
-document.addEventListener("keyup",
-(e) => {
-  if (e.key === "Escape") {
-    // console.log("ESCAPE");
-    app.ports.sendEscape.send(null); // "Escape" can mean many things. Let Elm interpret it.
-  }
-});
+document.addEventListener("keydown",
+  (e) => {
+    if (e.key === "Escape" || e.key === "Enter" || e.key === "Tab") {
+      // console.log(`Special key pressed: ${e.key}`);
+      app.ports.sendSpecial.send(e.key); // "Escape" etc can mean many things. Let Elm interpret it.
+      e.preventDefault();
+    }
+  });
 
 function trackCompositionStart(e) {
   isComposing = true;
@@ -156,16 +157,22 @@ function setCaretPosition(textNode) {
   }
 };
 
+function textNodeIn(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node;
+  }
+  return Array.from(node.childNodes).find(textNodeIn);
+}
+
 // Callback function to execute when mutations are observed
 const observation = (mutationList, _observer) => {
   for (const mutation of mutationList) {
-    // console.log(mutation);
     const arr = Array.from(mutation.addedNodes);
     if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
       // console.log(`A child node has been added or removed within ${mutation.target.id}`);
       // console.log(mutation.removedNodes);
       // console.log(mutation.addedNodes);
-      setCaretPosition(mutation.addedNodes[0]);
+      setCaretPosition(textNodeIn(mutation.addedNodes[0]));
       return;
     }
   }

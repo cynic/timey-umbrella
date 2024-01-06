@@ -12,4 +12,4 @@ port awesomeBarInput : (E.Value -> msg) -> Sub msg
 -- Tell Elm that the listener is removed, so the element can go too.
 port listenerRemoved : (() -> msg) -> Sub msg
 -- Tell Elm that the "Escape" key has been pressed.alias
-port sendEscape : (() -> msg) -> Sub msg
+port sendSpecial : (String -> msg) -> Sub msg
