@@ -144,17 +144,19 @@ function beforeInputListener(event) {
 
 function setCaretPosition(textNode) {
   // This is called AFTER text-changes have been made.
-  if (textRange == null) {
+  // if (textRange == null || 1 === 1) {
     let s = document.getSelection();
     textRange = document.createRange();
     textRange.setStart(textNode, caretPosition);
     textRange.collapse(true);
     s.removeAllRanges();
     s.addRange(textRange);
-  } else {
-    textRange.setStart(textNode, Math.min(caretPosition, textNode.data.length));
-    textRange.collapse(true);
-  }
+  // REMOVE premature optimization.
+  // SOMETIMES, the textRange changes.  When?  Dunno.  But I can't cache it.
+  // } else {
+  //   textRange.setStart(textNode, Math.min(caretPosition, textNode.data.length));
+  //   textRange.collapse(true);
+  // }
 };
 
 function textNodeIn(node) {
