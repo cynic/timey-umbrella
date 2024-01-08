@@ -41,8 +41,12 @@ body {
 }
 
 .token-viz {
-  background-color: lightgreen;
-  margin-left: 1ex;
+  /* background-color: lightgreen; */
+  /* margin-left: 1ex; */
   padding: 5px;
   border-radius: 5px;
+}
+
+.when {
+  background-color: khaki;
 }

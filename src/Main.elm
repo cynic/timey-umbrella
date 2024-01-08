@@ -190,9 +190,21 @@ parse offsets s acc =
                   |> Maybe.map (\last -> last.offset + last.extent - h.offset)
                   |> Maybe.withDefault 1
               }
+            newAcc =
+              (token, completion, combinedOffset) :: acc
           in
-            parse (List.drop n offsets) s ((token, completion, combinedOffset) :: acc)
-        ) |> Maybe.withDefault (parse tail s ((Description, Nothing, h) :: acc))
+            case tail of
+              h2::_ ->
+                parse (List.drop n offsets) s ((Description, Nothing, { offset = h.offset + h.extent, extent = (h2.offset - (h.offset + h.extent)) }) :: newAcc)
+              [] ->
+                parse (List.drop n offsets) s newAcc
+        ) |> Maybe.withDefault
+          ( case tail of
+              h2::_ ->
+                parse tail s ((Description, Nothing, { h | extent = h2.offset - h.offset }) :: acc)
+              [] ->
+                parse tail s ((Description, Nothing, h) :: acc)
+          )
 
 -- type alias ParserState =
 --   { offsetCount : Int
@@ -340,7 +352,7 @@ view model =
                           [ class "completion"
                           , contenteditable False
                           ]
-                          [ text "orrow" ]
+                          [ text (String.fromInt state.i) ]
                       ])
                 ])
               ]
@@ -349,14 +361,18 @@ view model =
             ( List.map
                 (\{offset, extent} ->
                   span
-                    [ class "token-viz" ]
-                    [ text <| String.fromInt offset
-                    , text "-"
-                    , text <| String.fromInt (offset + extent)
+                    []
+                    [ span
+                        [ class "token-viz" ]
+                        [ text <| String.fromInt offset
+                        , text "-"
+                        , text <| String.fromInt (offset + extent)
+                        , text " "
+                        , text "“"
+                        , text <| String.slice offset (offset+extent) state.s
+                        , text "”"
+                        ]
                     , text " "
-                    , text "“"
-                    , text <| String.slice offset (offset+extent) state.s
-                    , text "”"
                     ]
                 )
                 state.tokenised
@@ -372,14 +388,17 @@ view model =
                         ]
                     ]
                     [ text <| String.slice offset (offset+extent) state.s
-                    , Maybe.map (\completion_ ->
-                        span
-                          [ class "completion"
-                          , contenteditable False
-                          ]
-                          [ text completion_ ]
-                      ) completion
-                      |> Maybe.withDefault (text "")
+                    , if state.i > offset && state.i <= offset + extent then
+                        Maybe.map (\completion_ ->
+                          span
+                            [ class "completion"
+                            , contenteditable False
+                            ]
+                            [ text completion_ ]
+                        ) completion
+                        |> Maybe.withDefault (text "")
+                      else
+                        text ""
                     ]
                 )
                 state.parse
