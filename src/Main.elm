@@ -7,7 +7,7 @@ import Url exposing (Url)
 import Time exposing (Posix)
 import Browser.Events
 import Json.Decode as D
-import Html.Attributes exposing (contenteditable, id, class)
+import Html.Attributes exposing (contenteditable, id, class, classList)
 import Browser.Dom as Dom
 import Task
 import Html.Events exposing (on, preventDefaultOn)
@@ -65,16 +65,12 @@ type alias CoreDatumModel =
   }
 
 -- AwesomeBar start
-type alias StringData = String
-
 type Token
-  = Today StringData
-  | Tomorrow StringData
-  | Description StringData
-  | Whitespace Int -- number of whitespace characters
-  | AcceptLiterally
-  | Cursor
-  | CursorIn Token Int -- offset from the beginning of the literal string
+  = Today
+  | Tomorrow
+  | Description
+  -- | AcceptLiterally
+  -- | Cursor
   -- | AfterDays Int
   -- | AfterWeeks Int
 
@@ -89,7 +85,7 @@ type alias AwesomeBarState =
   { s : String
   , i : Int -- caret position
   , tokenised : List Offset
-  , parse : List AwesomeBarToken
+  , parse : List (Token, Maybe String, Offset)
   }
 -- AwesomeBar end
 
@@ -125,6 +121,78 @@ init _ _ key =
   }
   , Cmd.none
   )
+
+{-
+These are all `List String -> Maybe (Token, String, Int)`, where
+  - The result is `Nothing` if it doesn't apply
+  - The `Token` is the meaning if it does apply
+  - The `String` is the completion, if the caret is within or at the end
+  - The `Int` is the number of `Offset`s consumed in the case of success
+-}
+isToday : List String -> Maybe (Token, Maybe String, Int)
+isToday list =
+  case List.head list of
+    Just "tod" ->
+      Just (Today, Just "ay", 1)
+    Just "toda" ->
+      Just (Today, Just "y", 1)
+    Just "today" ->
+      Just (Today, Nothing, 1)
+    _ -> Nothing
+
+isTomorrow : List String -> Maybe (Token, Maybe String, Int)
+isTomorrow list =
+  case List.head list of
+    Just "tom" ->
+      Just (Tomorrow, Just "orrow", 1)
+    Just "tomo" ->
+      Just (Tomorrow, Just "rrow", 1)
+    Just "tomor" ->
+      Just (Tomorrow, Just "row", 1)
+    Just "tomorr" ->
+      Just (Tomorrow, Just "ow", 1)
+    Just "tomorro" ->
+      Just (Tomorrow, Just "w", 1)
+    Just "tomorrow" ->
+      Just (Tomorrow, Nothing, 1)
+    _ -> Nothing
+
+findFirst : List (a -> Maybe b) -> a -> Maybe b
+findFirst list data =
+  case list of
+    [] ->
+      Nothing
+    f::tail ->
+      case f data of
+        Nothing ->
+          findFirst tail data
+        x ->
+          x
+
+parse : List Offset -> String -> List (Token, Maybe String, Offset) -> List (Token, Maybe String, Offset)
+parse offsets s acc =
+  let
+    strings : List String
+    strings = List.map (\{offset, extent} -> String.slice offset (offset + extent) s) offsets
+  in
+    case offsets of
+      [] ->
+        List.reverse acc
+      h::tail ->
+        findFirst [ isToday, isTomorrow ] strings
+        |> Maybe.map (\(token, completion, n) ->
+          let
+            combinedOffset =
+              { offset = h.offset
+              , extent =
+                  List.drop (n - 1) offsets
+                  |> List.head
+                  |> Maybe.map (\last -> last.offset + last.extent - h.offset)
+                  |> Maybe.withDefault 1
+              }
+          in
+            parse (List.drop n offsets) s ((token, completion, combinedOffset) :: acc)
+        ) |> Maybe.withDefault (parse tail s ((Description, Nothing, h) :: acc))
 
 -- type alias ParserState =
 --   { offsetCount : Int
@@ -217,14 +285,31 @@ update msg model =
           Key Enter ->
             (model, Cmd.none)
           SetString s i ->
-            ({ model | mode = AwesomeBar { x | s = s, i = i, tokenised = tokenise s 0 Nothing [] } }
+            ( { model
+              | mode =
+                let
+                  tokens = tokenise s 0 Nothing []
+                in
+                  AwesomeBar
+                    { x
+                    | s = s
+                    , i = i
+                    , tokenised = tokens
+                    , parse = parse tokens s []
+                    }
+              }
             , Ports.shiftCaret i
             )
       Waiting ->
         (model, Cmd.none)
 
 -- VIEW
-
+classFor : Token -> String
+classFor token =
+  case token of
+    Today -> "when"
+    Tomorrow -> "when"
+    Description -> ""
 
 view : Model -> Browser.Document Msg
 view model =
@@ -276,13 +361,35 @@ view model =
                 )
                 state.tokenised
             )
+          , div
+            []
+            ( List.map
+                (\(token, completion, {offset, extent}) ->
+                  span
+                    [ classList
+                        [ ("token-viz", token /= Description)
+                        , (classFor token, token /= Description)
+                        ]
+                    ]
+                    [ text <| String.slice offset (offset+extent) state.s
+                    , Maybe.map (\completion_ ->
+                        span
+                          [ class "completion"
+                          , contenteditable False
+                          ]
+                          [ text completion_ ]
+                      ) completion
+                      |> Maybe.withDefault (text "")
+                    ]
+                )
+                state.parse
+            )
           ]
     ]
   }
 
 
 -- SUBSCRIPTIONS
-
 type EventInputType
   = InsertText Int -- offset position of caret
   | DeleteBackwards
@@ -445,8 +552,8 @@ subscriptions model =
         ( D.field "key" D.string
         |> D.map
           (\key ->
-          if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [Cursor], tokenised = [] })
-          else NoOp
+            if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
+            else NoOp
           )
         )
     AwesomeBar state ->

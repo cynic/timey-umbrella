@@ -36,11 +36,13 @@ body {
   font-style:oblique;
 }
 
-.placeholder {
+.completion {
   color: #999;
 }
 
 .token-viz {
   background-color: lightgreen;
   margin-left: 1ex;
+  padding: 5px;
+  border-radius: 5px;
 }
