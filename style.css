@@ -39,3 +39,8 @@ body {
 .placeholder {
   color: #999;
 }
+
+.token-viz {
+  background-color: lightgreen;
+  margin-left: 1ex;
+}

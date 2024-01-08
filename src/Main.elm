@@ -65,9 +65,31 @@ type alias CoreDatumModel =
   }
 
 -- AwesomeBar start
+type alias StringData = String
+
+type Token
+  = Today StringData
+  | Tomorrow StringData
+  | Description StringData
+  | Whitespace Int -- number of whitespace characters
+  | AcceptLiterally
+  | Cursor
+  | CursorIn Token Int -- offset from the beginning of the literal string
+  -- | AfterDays Int
+  -- | AfterWeeks Int
+
+type alias AwesomeBarToken = Token
+
+type alias Offset =
+  { offset : Int
+  , extent : Int
+  }
+
 type alias AwesomeBarState =
   { s : String
   , i : Int -- caret position
+  , tokenised : List Offset
+  , parse : List AwesomeBarToken
   }
 -- AwesomeBar end
 
@@ -104,6 +126,73 @@ init _ _ key =
   , Cmd.none
   )
 
+-- type alias ParserState =
+--   { offsetCount : Int
+--   , currentParse : List Token
+--   }
+
+-- startingParserState : ParserState
+-- startingParserState =
+--   { offsetCount = 0
+--   , currentParse = []
+--   }
+
+-- -- parseIntoTokens : (Int, List String) -> ParserState -> List Token
+-- -- parseIntoTokens (caret, list) state =
+-- --   {- the cursor might be anywhere in the list, including right at the start or
+-- --      right at the end.  In the parser state, I track the `offsetCount`, which is
+-- --      the number of characters that I've encountered thus far.
+
+-- --      If the offsetCount is
+-- --   -}
+-- --   case list of
+-- --     [] ->
+-- --       state.currentParse
+-- --     ""::restOfList ->
+-- --       {- The only way I'll see an empty string is if I have two consecutive spaces.
+-- --          So if I have a whitespace as my most recent parse, extend it; otherwise,
+-- --          put in a whitespace token with 2 consecutive spaces.
+-- --       -}
+-- --       case state.currentParse of
+-- --         Whitespace n::restOfParse ->
+-- --           parseIntoTokens caret restOfList
+-- --             { state
+-- --             | currentParse = Whitespace (n + 1)::restOfParse
+-- --             , offsetCount = state.offsetCount + 1
+-- --             }
+-- --         other ->
+-- --           parseIntoTokens caret restOfList
+-- --             { state
+-- --             | currentParse = Whitespace 2::other
+-- --             , offsetCount = state.offsetCount + 2
+-- --             }
+-- --     _ ->
+-- --       {- Chances are that this is a normal word (or phrase), but it may be keyword(s)
+-- --          with some special meaning.  So, let's see what we can find, longest
+-- --          chain-of-meaning being prioritised over a smaller one, and taking the
+-- --          current parse into account.
+-- --       -}
+-- --       if 
+-- --     [] ->
+-- --       state.currentParse
+
+tokenise : String -> Int -> Maybe Offset -> List Offset -> List Offset
+tokenise s i current acc =
+  case (String.slice i (i+1) s, current) of
+    -- end-of-input cases
+    ("", Nothing) ->
+      List.reverse acc
+    ("", Just c) ->
+      List.reverse (c :: acc)
+    -- whitespace cases
+    (" ", Nothing) ->
+      tokenise s (i+1) Nothing acc
+    (" ", Just c) ->
+      tokenise s (i+1) Nothing (c :: acc)
+    (_, Nothing) ->
+      tokenise s (i+1) (Just { offset = i, extent = 1 }) acc
+    (_, Just c) ->
+      tokenise s (i+1) (Just { c | extent = c.extent + 1 }) acc
 
 -- UPDATE
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -128,7 +217,7 @@ update msg model =
           Key Enter ->
             (model, Cmd.none)
           SetString s i ->
-            ({ model | mode = AwesomeBar { x | s = s, i = i } }
+            ({ model | mode = AwesomeBar { x | s = s, i = i, tokenised = tokenise s 0 Nothing [] } }
             , Ports.shiftCaret i
             )
       Waiting ->
@@ -147,26 +236,46 @@ view model =
       Waiting ->
         div [] [ text "Waiting…" ]
       AwesomeBar state ->
-        Keyed.node "div"
-          [ id "awesomebar-container" ]
-          [ ("title", div
-            [ id "awesomebar-title" ]
-            [ text "Task" ])
-          , ("bar", Keyed.node "div"
-            [ contenteditable True
-            , id "awesomebar"
-            ]
-            [ ( state.s
-              , div
-                  []
-                  [ text <| {-Debug.log "Generating TEXT node"-} state.s
-                  , span
-                      [ class "placeholder"
-                      , contenteditable False
-                      ]
-                      [ text "orrow" ]
-                  ])
-            ])
+        div
+          []
+          [ Keyed.node "div"
+              [ id "awesomebar-container" ]
+              [ ("title", div
+                [ id "awesomebar-title" ]
+                [ text "Task" ])
+              , ("bar", Keyed.node "div"
+                [ contenteditable True
+                , id "awesomebar"
+                ]
+                [ ( state.s
+                  , div
+                      []
+                      [ text <| {-Debug.log "Generating TEXT node"-} state.s
+                      , span
+                          [ class "completion"
+                          , contenteditable False
+                          ]
+                          [ text "orrow" ]
+                      ])
+                ])
+              ]
+          , div
+            []
+            ( List.map
+                (\{offset, extent} ->
+                  span
+                    [ class "token-viz" ]
+                    [ text <| String.fromInt offset
+                    , text "-"
+                    , text <| String.fromInt (offset + extent)
+                    , text " "
+                    , text "“"
+                    , text <| String.slice offset (offset+extent) state.s
+                    , text "”"
+                    ]
+                )
+                state.tokenised
+            )
           ]
     ]
   }
@@ -336,7 +445,7 @@ subscriptions model =
         ( D.field "key" D.string
         |> D.map
           (\key ->
-          if key == " " then SwitchMode (AwesomeBar { s = "", i = 0 })
+          if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [Cursor], tokenised = [] })
           else NoOp
           )
         )
