@@ -13,3 +13,5 @@ port awesomeBarInput : (E.Value -> msg) -> Sub msg
 port listenerRemoved : (() -> msg) -> Sub msg
 -- Tell Elm that the "Escape" key has been pressed.alias
 port sendSpecial : (String -> msg) -> Sub msg
+-- Tell Elm that the cursor has moved
+port caretMoved : (Int -> msg) -> Sub msg

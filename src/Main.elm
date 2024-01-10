@@ -73,9 +73,6 @@ type Token
   -- | Cursor
   -- | AfterDays Int
   -- | AfterWeeks Int
-
-type alias AwesomeBarToken = Token
-
 type alias Offset =
   { offset : Int
   , extent : Int
@@ -102,6 +99,7 @@ type ABMsg
   = SetString String Int
   | ListenerRemoved
   | Key ABSpecialKey
+  | CaretMoved Int
 
 type Msg
   = NoOp
@@ -296,6 +294,12 @@ update msg model =
             (model, Cmd.none)
           Key Enter ->
             (model, Cmd.none)
+          CaretMoved i ->
+            ( { model
+              | mode = AwesomeBar { x | i = i }
+              }
+            , Cmd.none
+            )
           SetString s i ->
             ( { model
               | mode =
@@ -349,11 +353,14 @@ view model =
                       []
                       [ text <| {-Debug.log "Generating TEXT node"-} state.s
                       , span
-                          [ class "completion"
-                          , contenteditable False
+                          [ contenteditable False
+                          , class "completion"
+                          , Html.Attributes.attribute "data-completion" "blah"
                           ]
-                          [ text (String.fromInt state.i) ]
-                      ])
+                          [ text "blah" ]
+                      , text "and the end"
+                      ]
+                  )
                 ])
               ]
           , div
@@ -393,6 +400,7 @@ view model =
                           span
                             [ class "completion"
                             , contenteditable False
+                            , Html.Attributes.attribute "data-completion" completion_
                             ]
                             [ text completion_ ]
                         ) completion
@@ -571,7 +579,7 @@ subscriptions model =
         ( D.field "key" D.string
         |> D.map
           (\key ->
-            if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
+            if key == " " then SwitchMode (AwesomeBar { s = "Hello, world!", i = 0, parse = [], tokenised = [] })
             else NoOp
           )
         )
@@ -580,6 +588,7 @@ subscriptions model =
         [ Ports.awesomeBarInput (D.decodeValue (decodeInput model state) >> Result.withDefault NoOp)
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
         , Ports.sendSpecial decodeSpecialKey
+        , Ports.caretMoved (\position -> AB <| CaretMoved position)
         ]
 
 -- PROGRAM

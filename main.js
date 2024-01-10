@@ -62,20 +62,92 @@ isComposing = false;
 lastInputEvent = null;
 bar = null;
 textRange = null;
+caretTracker = 0; // this is SEPARATE from caretPosition.
+// 👆 this is used to tell Elm what JS sees as the caret position.  It will not
+// result in Elm forcing a change of caret position.
 
 let app = Elm.Main.init({
   node: document.getElementById('myapp'),
   flags: null
 });
 
-document.addEventListener("keydown",
-  (e) => {
-    if (e.key === "Escape" || e.key === "Enter" || e.key === "Tab") {
-      // console.log(`Special key pressed: ${e.key}`);
-      app.ports.sendSpecial.send(e.key); // "Escape" etc can mean many things. Let Elm interpret it.
-      e.preventDefault();
+document.addEventListener("keyup", (e) => { checkCaretChange(); });
+document.addEventListener("mouseup", (e) => { checkCaretChange(); });
+
+function setCaretPosition() {
+  const children = Array.from(bar.childNodes);
+  var char_count = caretPosition;
+  for (const child of children) {
+    if (child.nodeType == Node.ELEMENT_NODE && child.dataset.completion !== undefined) {
+      // skip over completions.
+      continue;
     }
-  });
+    console.log(child);
+    this_length = child.textContent.length;
+    if (char_count - this_length <= 0) { // we've reached the right place!
+      let offset = char_count;
+      let s = document.getSelection();
+      let txt = child.childNodes[0]; // this would be a TEXT node.
+      textRange = document.createRange();
+      textRange.setStart(txt, offset);
+      textRange.collapse(true);
+      s.removeAllRanges();
+      s.addRange(textRange);
+    }
+    char_count -= this_length;
+  }
+}
+
+_debug_getCaretPosition = null;
+
+// We have one of these cases:
+// div#awesomebar > div > span > text
+// OR
+// div#awesomebar > div > text
+function getCaretPosition() {
+  const selection = window.getSelection();
+  // find the node with focus.
+  const focused = selection.focusNode;
+  const offset = selection.focusOffset;
+  // if this is a text-node, then the awesomebar must be two levels up.
+  var focused_child;
+  // case: div#awesomebar > div > text
+  if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.id === "awesomebar") {
+    focused_child = focused;
+  // case: div #awesomebar > div > span > text
+  } else if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.parentNode.id === "awesomebar") {
+    focused_child = focused.parentNode;
+  } else {
+    console.log("Where is this node?  I don't know.  See _debug_getCaretPosition.");
+    _debug_getCaretPosition = focused;
+    console.log(focused);
+    return;
+  }
+  // Now get the very first child of the awesomebar, counting chars on the way.
+  char_count = offset;
+  for (var current = focused_child.previousSibling; current; current = current.previousSibling) {
+    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
+      // skip over completions.
+      continue;
+    }
+    console.log(current);
+    char_count += current.textContent.length;
+  }
+  // this will be the focus.
+  return char_count;
+}
+
+function checkCaretChange() {
+  if (bar === null) {
+    return;
+  }
+  const old = caretTracker;
+  caretTracker = getCaretPosition();
+  console.log(`Caret position: ${caretTracker}`);
+  if (old != caretTracker) {
+    app.ports.caretMoved.send(caretTracker);
+  }
+}
 
 function trackCompositionStart(e) {
   isComposing = true;
@@ -142,22 +214,14 @@ function beforeInputListener(event) {
     }
 }
 
-function setCaretPosition(textNode) {
-  // This is called AFTER text-changes have been made.
-  // if (textRange == null || 1 === 1) {
-    let s = document.getSelection();
-    textRange = document.createRange();
-    textRange.setStart(textNode, caretPosition);
-    textRange.collapse(true);
-    s.removeAllRanges();
-    s.addRange(textRange);
-  // REMOVE premature optimization.
-  // SOMETIMES, the textRange changes.  When?  Dunno.  But I can't cache it.
-  // } else {
-  //   textRange.setStart(textNode, Math.min(caretPosition, textNode.data.length));
-  //   textRange.collapse(true);
-  // }
-};
+// function setCaretPosition(textNode) {
+//     let s = document.getSelection();
+//     textRange = document.createRange();
+//     textRange.setStart(textNode, caretPosition);
+//     textRange.collapse(true);
+//     s.removeAllRanges();
+//     s.addRange(textRange);
+// };
 
 function textNodeIn(node) {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -174,7 +238,8 @@ const observation = (mutationList, _observer) => {
       // console.log(`A child node has been added or removed within ${mutation.target.id}`);
       // console.log(mutation.removedNodes);
       // console.log(mutation.addedNodes);
-      setCaretPosition(textNodeIn(mutation.addedNodes[0]));
+      // setCaretPosition(textNodeIn(mutation.addedNodes[0]));
+      setCaretPosition();
       return;
     }
   }
@@ -187,6 +252,7 @@ function goodbyeBar() {
   bar.removeEventListener("beforeinput", beforeInputListener);
   bar.removeEventListener("compositionstart", trackCompositionStart);
   bar.removeEventListener("compositionend", trackCompositionEnd);
+  bar.removeEventListener("caret", checkCaretChange);
   observer.disconnect();
   // reset all the state-tracking variables
   textRange = null;
@@ -194,6 +260,7 @@ function goodbyeBar() {
   isComposing = false;
   caretPosition = 0;
   lastInputEvent = null;
+  caretTracker = 0;
   // Tell Elm that it can now get rid of the element
   app.ports.listenerRemoved.send(null);
 }
@@ -207,11 +274,11 @@ function initializeBar() {
   bar.addEventListener("beforeinput", beforeInputListener);
   bar.addEventListener("compositionstart", trackCompositionStart);
   bar.addEventListener("compositionend", trackCompositionEnd);
+  bar.addEventListener("caret", checkCaretChange);
   bar.focus();
 
   // Start observing the target node for configured mutations
   observer.observe(bar, { characterData: true, childList: true, subtree: false });
-
 }
 
 app.ports.displayAwesomeBar.subscribe(initializeBar);
