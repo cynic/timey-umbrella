@@ -441,7 +441,7 @@ classifyInput inputType data =
     "deleteContentForward" ->
       DeleteForwards
     "insertCompositionText" ->
-      InsertText 0
+      InsertText (String.length data)
     -- "insertLineBreak" ->
     --   Disallow
     -- "insertParagraph" ->
@@ -588,7 +588,7 @@ subscriptions model =
         [ Ports.awesomeBarInput (D.decodeValue (decodeInput model state) >> Result.withDefault NoOp)
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
         , Ports.sendSpecial decodeSpecialKey
-        , Ports.caretMoved (\position -> AB <| CaretMoved position)
+        , Ports.caretMoved (D.decodeValue (D.field "start" D.int) >> Result.map (CaretMoved >> AB) >> Result.withDefault NoOp)
         ]
 
 -- PROGRAM

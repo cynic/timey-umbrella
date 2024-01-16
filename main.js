@@ -60,6 +60,7 @@ position seems to always be correct.
 caretPosition = 0; // this is set via the `shiftCaret` port
 isComposing = false;
 lastInputEvent = null;
+lastInputEvent_range = null;
 bar = null;
 textRange = null;
 caretTracker = 0; // this is SEPARATE from caretPosition.
@@ -98,43 +99,92 @@ function setCaretPosition() {
   }
 }
 
-_debug_getCaretPosition = null;
+_debug_getCaretPosition_f = null;
+_debug_getCaretPosition_a = null;
 
 // We have one of these cases:
 // div#awesomebar > div > span > text
 // OR
 // div#awesomebar > div > text
-function getCaretPosition() {
+function getCaretPositions() {
   const selection = window.getSelection();
-  // find the node with focus.
-  const focused = selection.focusNode;
-  const offset = selection.focusOffset;
-  // if this is a text-node, then the awesomebar must be two levels up.
-  var focused_child;
-  // case: div#awesomebar > div > text
-  if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.id === "awesomebar") {
-    focused_child = focused;
-  // case: div #awesomebar > div > span > text
-  } else if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.parentNode.id === "awesomebar") {
-    focused_child = focused.parentNode;
-  } else {
-    console.log("Where is this node?  I don't know.  See _debug_getCaretPosition.");
-    _debug_getCaretPosition = focused;
-    console.log(focused);
-    return;
-  }
-  // Now get the very first child of the awesomebar, counting chars on the way.
-  char_count = offset;
-  for (var current = focused_child.previousSibling; current; current = current.previousSibling) {
-    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-      // skip over completions.
-      continue;
+  let getFocusPosition = () => {
+    // find the node with focus.
+    const focused = selection.focusNode;
+    if (focused === null) return -1;
+    const offset = selection.focusOffset;
+    // if this is a text-node, then the awesomebar must be two levels up.
+    var focused_child;
+    // case: div#awesomebar > div > text
+    if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.id === "awesomebar") {
+      focused_child = focused;
+    // case: div #awesomebar > div > span > text
+    } else if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.parentNode.id === "awesomebar") {
+      focused_child = focused.parentNode;
+    } else {
+      console.log("FOCUS: Where is this node?  I don't know.  See _debug_getCaretPosition_f.");
+      _debug_getCaretPosition_f = focused;
+      console.log(focused);
+      return -1;
     }
-    console.log(current);
-    char_count += current.textContent.length;
+    // Now get the very first child of the awesomebar, counting chars on the way.
+    var char_count = offset;
+    for (var current = focused_child.previousSibling; current; current = current.previousSibling) {
+      if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
+        // skip over completions.
+        continue;
+      }
+      console.log(current);
+      char_count += current.textContent.length;
+    }
+    // assign!
+    return char_count;
   }
-  // this will be the focus.
-  return char_count;
+  let focus = getFocusPosition();
+  let getAnchorPosition = () => {
+    // okay.  Now, get the anchor offset.  The anchor doesn't move, but the focus does.
+    // Together, they will give me the real range within the string.
+    if (selection.isCollapsed) {
+      return focus; // the two are the same.
+    }
+    // find the node with focus.
+    const anchor = selection.anchorNode;
+    if (anchor === null) return -1;
+    const offset = selection.anchorOffset;
+    // if this is a text-node, then the awesomebar must be two levels up.
+    var anchor_child;
+    // case: div#awesomebar > div > text
+    if (anchor.nodeType == Node.TEXT_NODE && anchor.parentNode.parentNode.id === "awesomebar") {
+      anchor_child = anchor;
+    // case: div #awesomebar > div > span > text
+    } else if (anchor.nodeType == Node.TEXT_NODE && anchor.parentNode.parentNode.parentNode.id === "awesomebar") {
+      anchor_child = anchor.parentNode;
+    } else {
+      console.log("ANCHOR: Where is this node?  I don't know.  See _debug_getCaretPosition_a.");
+      _debug_getCaretPosition_a = anchor;
+      console.log(anchor);
+      return -1;
+    }
+    // Now get the very first child of the awesomebar, counting chars on the way.
+    var char_count = offset;
+    for (var current = anchor_child.previousSibling; current; current = current.previousSibling) {
+      if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
+        // skip over completions.
+        continue;
+      }
+      console.log(current);
+      char_count += current.textContent.length;
+    }
+    // assign!
+    return char_count;
+  };
+  let anchor = getAnchorPosition();
+
+  // give back the start and end
+  if (focus === -1 || anchor === -1) {
+    return null;
+  }
+  return { start: Math.min(focus, anchor), end: Math.max(focus, anchor) };
 }
 
 function checkCaretChange() {
@@ -142,24 +192,38 @@ function checkCaretChange() {
     return;
   }
   const old = caretTracker;
-  caretTracker = getCaretPosition();
-  console.log(`Caret position: ${caretTracker}`);
-  if (old != caretTracker) {
-    app.ports.caretMoved.send(caretTracker);
+  const tmp = getCaretPositions();
+  if (tmp) {
+    caretTracker = tmp;
+    console.log(caretTracker);
+    if (old != caretTracker && caretTracker.start === caretTracker.end) {
+      app.ports.caretMoved.send(caretTracker);
+    }
   }
 }
 
 function trackCompositionStart(e) {
+  console.log("Composition started.");
   isComposing = true;
+  lastInputEvent_range = caretTracker;
 }
 
 function trackCompositionEnd(e) {
+  console.log("Composition ended.");
   isComposing = false;
+  if (lastInputEvent === null) { // can happen if canceled
+    lastInputEvent_range = null;
+    return;
+  }
   beforeInputListener(lastInputEvent);
   lastInputEvent = null;
+  lastInputEvent_range = null;
 }
 
 function beforeInputListener(event) {
+  if (event.inputType.match("^history..do")) {
+    return; // don't handle this.
+  }
   if (isComposing) {
     // console.log(`Got ${event.inputType} but still composing.`);
     lastInputEvent = event;
@@ -179,39 +243,50 @@ function beforeInputListener(event) {
     const range = event.getTargetRanges()[0];
     // Now tell Elm about it.
     // console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
-    app.ports.awesomeBarInput.send(
-      {
-        inputType: event.inputType
+    let packaged =
+      { inputType: event.inputType
         , data: replacement
         , start: range.startOffset
         , end: range.endOffset
-      });
-    } else {
-      // Here I need to get the selection position as well.
-      // If we're in 'beforeinput', then we can assume focus??
-      // I'm not 100% sure, but I don't see how it can be false
-      // (barring programmatic input), so the temptation is to go with it…
-      // But hey, what can I say, I'm a safety girl!
-      // bar.focus();
-      const range = window.getSelection().getRangeAt(0);
-      const preSelectionRange = range.cloneRange();
-      preSelectionRange.selectNodeContents(bar);
-      preSelectionRange.setEnd(range.startContainer, range.startOffset);
-      const start = preSelectionRange.toString().length;
-      const end = start + range.toString().length;
-      // unless there is an ACTUAL selection, `start` and `end` should be the same.
-      // Now tell Elm about it.
-      // console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
-      app.ports.awesomeBarInput.send(
-        {
-          inputType: event.inputType
-          , data: event.inputType === "insertFromPaste"
-              ? event.dataTransfer.getData("text")
-              : event.data ?? ""
-          , start: start
-          , end: end
-        });
-    }
+      };
+    console.log(packaged);
+    app.ports.awesomeBarInput.send(packaged);
+  } else {
+    // Here I need to get the selection position as well.
+    // If we're in 'beforeinput', then we can assume focus??
+    // I'm not 100% sure, but I don't see how it can be false
+    // (barring programmatic input), so the temptation is to go with it…
+    // But hey, what can I say, I'm a safety girl!
+    // bar.focus();
+    [ start, end ] =
+      (() => {
+        if (lastInputEvent_range) {
+          return [ lastInputEvent_range.start, lastInputEvent_range.end ];
+        } else {
+          // const range = window.getSelection().getRangeAt(0);
+          // const preSelectionRange = range.cloneRange();
+          // preSelectionRange.selectNodeContents(bar);
+          // preSelectionRange.setEnd(range.startContainer, range.startOffset);
+          // const start = preSelectionRange.toString().length;
+          // const end = start + range.toString().length;
+          // return [ start, end ];
+          return [ caretTracker.start, caretTracker.end ];
+        }
+      })();
+    // unless there is an ACTUAL selection, `start` and `end` should be the same.
+    // Now tell Elm about it.
+    // console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
+    let packaged =
+      { inputType: event.inputType
+        , data: event.inputType === "insertFromPaste"
+            ? event.dataTransfer.getData("text")
+            : event.data ?? ""
+        , start: start
+        , end: end
+      };
+    console.log(packaged);
+    app.ports.awesomeBarInput.send(packaged);
+  }
 }
 
 // function setCaretPosition(textNode) {
