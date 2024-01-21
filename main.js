@@ -128,7 +128,7 @@ function countForwardsTo(char_count) {
     }
     char_count -= len;
   }
-  return char_count;
+  return { bar, char_count };
 }
 
 function setCaretPosition() {
