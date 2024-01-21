@@ -83,27 +83,44 @@ document.addEventListener("keyup", (e) => {
   // I need to inform Elm about that.
   if (caretChangingKeys.has(e.key)) {
     e.stopPropagation();
-    console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
+    // console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
     checkCaretChange();
   }
 });
-document.addEventListener("mouseup", (e) => { e.stopPropagation(); checkCaretChange(); });
+document.addEventListener("mouseup", (e) => {
+  if (document.activeElement.id !== "awesomebar") {
+    return true;
+  }
+  e.stopPropagation();
+  checkCaretChange();
+});
 document.addEventListener("selectionchange", (e) => {
   if (document.activeElement.id !== "awesomebar") {
-    return;
+    return true;
   }
-  console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
+  // console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
   checkCaretChange();
 });
 
+function userTextLength() {
+  var char_count = 0;
+  for (var current = bar.firstChild; current; current = current.nextSibling) {
+    // console.log(current);
+    char_count += current.textContent.length;
+    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+      char_count -= parseInt(current.dataset.completionlen);
+    }
+  }
+  return char_count;
+}
+
 function countForwardsTo(char_count) {
   for (var current = bar.firstChild; current; current = current.nextSibling) {
-    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-      // skip over completions.
-      continue;
-    }
     // console.log(current);
-    let len = current.textContent.length;
+    var len = current.textContent.length;
+    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+      len -= parseInt(current.dataset.completionlen);
+    }
     if (char_count - len <= 0) {
       return { node: current, offset: char_count };
     }
@@ -113,7 +130,7 @@ function countForwardsTo(char_count) {
 }
 
 function setCaretPosition() {
-  console.log(`Setting caret position to ${caretPosition}`);
+  //console.log(`Setting caret position to ${caretPosition}`);
   let s = document.getSelection();
   let { node, offset } = countForwardsTo(caretPosition);
   let r = document.createRange();
@@ -126,12 +143,11 @@ function setCaretPosition() {
 
 function countBackwardsFrom(node, char_count) {
   for (var current = node; current; current = current.previousSibling) {
-    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-      // skip over completions.
-      continue;
-    }
     // console.log(current);
     char_count += current.textContent.length;
+    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+      char_count -= parseInt(current.dataset.completionlen);
+    }
   }
   return char_count;
 }
@@ -139,11 +155,10 @@ function countBackwardsFrom(node, char_count) {
 function countNodesForwards(node, count) {
   var char_count = 0;
   for (var i = 0, current = node.firstChild; i < count && current; i++, current = current.nextSibling) {
-    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-      // skip over completions.
-      continue;
-    }
     char_count += current.textContent.length;
+    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+      char_count -= parseInt(current.dataset.completionlen);
+    }
   }
   return char_count;
 }
@@ -187,7 +202,7 @@ function getCaretPosition(selection, getNode, getOffset) {
 // OR
 // div#awesomebar > text
 function getCaretPositions() {
-  console.log(`Updating caret position, '${bar.textContent}'`);
+  // console.log(`Updating caret position, '${bar.textContent}'`);
   if (document.activeElement.id !== "awesomebar") {
     console.log("Active element is NOT the awesomebar, it is 👇");
     console.log(document.activeElement);
@@ -211,7 +226,7 @@ function checkCaretChange() {
   const tmp = getCaretPositions();
   if (tmp) {
     caretTracker = tmp;
-    console.log(caretTracker);
+    // console.log(caretTracker);
     if (old != caretTracker && caretTracker.start === caretTracker.end) {
       app.ports.caretMoved.send(caretTracker);
     }
@@ -219,13 +234,13 @@ function checkCaretChange() {
 }
 
 function trackCompositionStart(e) {
-  console.log("Composition started.");
+  // console.log("Composition started.");
   isComposing = true;
   lastInputEvent_range = caretTracker;
 }
 
 function trackCompositionEnd(e) {
-  console.log("Composition ended.");
+  // console.log("Composition ended.");
   isComposing = false;
   if (lastInputEvent === null) { // can happen if canceled
     lastInputEvent_range = null;
@@ -266,7 +281,7 @@ function beforeInputListener(event) {
         , start: range.startOffset
         , end: range.endOffset
       };
-    console.log(packaged);
+    // console.log(packaged);
     app.ports.awesomeBarInput.send(packaged);
   } else {
     // Here I need to get the selection position as well.
@@ -301,7 +316,7 @@ function beforeInputListener(event) {
         , start: start
         , end: end
       };
-    console.log(packaged);
+    // console.log(packaged);
     app.ports.awesomeBarInput.send(packaged);
   }
 }
@@ -313,7 +328,7 @@ function textNodeIn(node) {
   }
   var stack = [node];
   while (stack.length > 0) {
-//    console.log(stack);
+    // console.log(stack);
     var current = stack.pop();
     for (var i = 0; i < current.childNodes.length; i++) {
       if (current.childNodes[i].nodeType === Node.TEXT_NODE) {
@@ -324,7 +339,7 @@ function textNodeIn(node) {
       }
     }
   }
-  console.log("Nothing, null'ing out.");
+  console.log("textNodeIn(…): Nothing, null'ing out.");
   return null;
 }
 
@@ -334,7 +349,7 @@ const observation = (mutationList, _observer) => {
     //console.log(mutation);
     const arr = Array.from(mutation.addedNodes);
     if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
-      console.log(`A child node has been added or removed within ${mutation.target.id}`);
+      // console.log(`A child node has been added or removed within ${mutation.target.id}`);
       // console.log(mutation.removedNodes);
       // console.log(mutation.addedNodes);
       // setCaretPosition(textNodeIn(mutation.addedNodes[0]));
@@ -342,7 +357,7 @@ const observation = (mutationList, _observer) => {
       return;
     }
     if (mutation.type == "characterData") {
-      console.log(`Character data has changed within ${mutation.target.parentNode.tagName} ${mutation.target.parentNode.id}, now '${mutation.target.textContent}'`);
+      // console.log(`Character data has changed within ${mutation.target.parentNode.tagName} ${mutation.target.parentNode.id}, now '${mutation.target.textContent}'`);
       setCaretPosition();
       return;
     }
@@ -387,10 +402,10 @@ app.ports.displayAwesomeBar.subscribe(initializeBar);
 app.ports.hideAwesomeBar.subscribe(goodbyeBar);
 
 app.ports.shiftCaret.subscribe((p) => {
-  console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
+  // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
   caretPosition = p;
   caretTracker = { start: caretPosition, end: caretPosition };
-  if (bar.textContent.length >= p) {
+  if (userTextLength() >= p) {
     // go ahead & invoke now.
     setCaretPosition();
   }

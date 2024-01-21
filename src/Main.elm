@@ -106,17 +106,19 @@ type Msg
   = NoOp
   | SwitchMode Mode
   | AB ABMsg
+  | Tick Posix
 
 type alias Model =
   { key : Navigation.Key
   , mode : Mode
+  , nowish : Posix
   }
-
 
 init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ _ key =
   ( { key = key
   , mode = Waiting
+  , nowish = Time.millisToPosix 0
   }
   , Cmd.none
   )
@@ -276,9 +278,11 @@ tokenise s i current acc =
 -- UPDATE
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case Debug.log "MESSAGE" msg of
+  case msg of
   NoOp ->
     (model, Cmd.none)
+  Tick time ->
+    ({ model | nowish = time }, Cmd.none)
   SwitchMode (AwesomeBar x) ->
     ({ model | mode = AwesomeBar x }, Ports.displayAwesomeBar ())
   SwitchMode Waiting ->
@@ -315,7 +319,7 @@ update msg model =
                     , parse = parse tokens s []
                     }
               }
-            , Ports.shiftCaret (Debug.log "Requesting caret shift to" i)
+            , Ports.shiftCaret ({-Debug.log "Requesting caret shift to"-} i)
             )
       Waiting ->
         (model, Cmd.none)
@@ -328,29 +332,48 @@ classFor token =
     Tomorrow -> "when"
     Description -> ""
 
-tokenToView : String -> Int -> (Token, Maybe String, Offset) -> Html Msg
-tokenToView s caretPosition (token, completion, {offset, extent}) =
+tokenWithoutCompletion : String -> Token -> String -> Html Msg
+tokenWithoutCompletion s token txt =
   span
     [ classList
         [ ("token-viz", token /= Description)
         , (classFor token, token /= Description)
         ]
     ]
-    [ text <| String.slice offset (offset+extent) s
-    , if caretPosition > offset && caretPosition <= offset + extent then
-        Maybe.map (\completion_ ->
-          span
-            [ class "completion"
-            , contenteditable False
-            , Html.Attributes.attribute "inert" "true"
-            , Html.Attributes.attribute "data-completion" completion_
-            ]
-            [ text completion_ ]
-        ) completion
-        |> Maybe.withDefault (text "")
-      else
-        text ""
+    [ text txt ]
+
+tokenWithCompletion : String -> Token -> String -> String -> Html Msg
+tokenWithCompletion s token completion txt =
+  span
+    [ classList
+        [ ("token-viz", token /= Description)
+        , (classFor token, token /= Description)
+        ]
+    , Html.Attributes.attribute "data-completionlen" (String.fromInt <| String.length completion)
     ]
+    [ text txt
+    , span
+        [ class "completion"
+        , contenteditable False
+        , Html.Attributes.attribute "inert" "true"
+        , Html.Attributes.attribute "data-completion" completion
+        ]
+        [ text completion ]
+    ]
+  
+
+tokenToView : String -> Int -> (Token, Maybe String, Offset) -> Html Msg
+tokenToView s caretPosition (token, completion, {offset, extent}) =
+  let
+    txt = String.slice offset (offset+extent) s
+  in
+    case (completion, offset <= caretPosition && offset + extent >= caretPosition) of
+      (Nothing, _) ->
+        tokenWithoutCompletion s token txt
+      (_, False) ->
+        tokenWithoutCompletion s token txt
+      (Just completion_, True) ->
+        tokenWithCompletion s token completion_ txt
 
 view : Model -> Browser.Document Msg
 view model =
@@ -441,31 +464,7 @@ view model =
             )
           , div
             []
-            ( List.map
-                (\(token, completion, {offset, extent}) ->
-                  span
-                    [ classList
-                        [ ("token-viz", token /= Description)
-                        , (classFor token, token /= Description)
-                        ]
-                    ]
-                    [ text <| String.slice offset (offset+extent) state.s
-                    , if state.i > offset && state.i <= offset + extent then
-                        Maybe.map (\completion_ ->
-                          span
-                            [ class "completion"
-                            , contenteditable False
-                            , Html.Attributes.attribute "data-completion" completion_
-                            ]
-                            [ text completion_ ]
-                        ) completion
-                        |> Maybe.withDefault (text "")
-                      else
-                        text ""
-                    ]
-                )
-                state.parse
-            )
+            ( List.map (tokenToView state.s state.i) state.parse )
           ]
     ]
   }
@@ -473,7 +472,7 @@ view model =
 
 -- SUBSCRIPTIONS
 type EventInputType
-  = InsertText Int -- offset position of caret
+  = InsertText
   | DeleteBackwards
   | DeleteForwards
   | Disallow
@@ -482,11 +481,11 @@ classifyInput : String -> String -> EventInputType
 classifyInput inputType data =
   case {-Debug.log "inputType"-} inputType of
     "insertText" ->
-      InsertText (String.length data)
+      InsertText
     "insertReplacementText" ->
-      InsertText (String.length data)
+      InsertText
     "insertFromPaste" ->
-      InsertText (String.length data)
+      InsertText
     "deleteByCut" ->
       DeleteBackwards
     "deleteContent" ->
@@ -496,7 +495,7 @@ classifyInput inputType data =
     "deleteContentForward" ->
       DeleteForwards
     "insertCompositionText" ->
-      InsertText (String.length data)
+      InsertText
     -- "insertLineBreak" ->
     --   Disallow
     -- "insertParagraph" ->
@@ -577,37 +576,41 @@ classifyInput inputType data =
       Debug.log "Unhandled inputType seen" x
       |> \_ -> Disallow
 
-decodeInput : Model -> AwesomeBarState -> D.Decoder Msg
-decodeInput model state =
-  D.map4
-    (\inputType data start end ->
-      case classifyInput inputType data of
-        Disallow ->
-          NoOp
-        InsertText added ->
-          let
-            -- added = {-Debug.log "Chars added" <|-} String.length data
-            left = {-Debug.log "Prefix" <|-} String.left start state.s
-            right = {-Debug.log "Suffix" <|-} String.dropLeft end state.s
-          in
-            AB (SetString (left ++ data ++ right) (start + added))
-        DeleteBackwards ->
-          if start == 0 && end == start then
-            NoOp
-          else if start == end then
-            AB (SetString (String.left (start - 1) state.s ++ String.dropLeft end state.s) (start - 1))
-          else
-            AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
-        DeleteForwards ->
-          if start == end then
-            AB (SetString (String.left start state.s ++ String.dropLeft (end + 1) state.s) start)
-          else
-            AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
-    )
-    (D.field "inputType" D.string)
-    (D.field "data" D.string)
-    (D.field "start" D.int)
-    (D.field "end" D.int)
+decodeInput : Model -> D.Decoder Msg
+decodeInput model =
+  case model.mode of
+    Waiting ->
+      D.fail "Not in awesomebar mode"
+    AwesomeBar state ->
+      D.map4
+        (\inputType data start end ->
+          case classifyInput inputType data of
+            Disallow ->
+              NoOp
+            InsertText ->
+              let
+                added = {-Debug.log "Chars added" <|-} String.length data
+                left = {-Debug.log "Prefix" <|-} String.left start state.s
+                right = {-Debug.log "Suffix" <|-} String.dropLeft end state.s
+              in
+                AB (SetString (left ++ data ++ right) (start + added))
+            DeleteBackwards ->
+              if start == 0 && end == start then
+                NoOp
+              else if start == end then
+                AB (SetString (String.left (start - 1) state.s ++ String.dropLeft end state.s) (start - 1))
+              else
+                AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
+            DeleteForwards ->
+              if start == end then
+                AB (SetString (String.left start state.s ++ String.dropLeft (end + 1) state.s) start)
+              else
+                AB (SetString (String.left start state.s ++ String.dropLeft end state.s) start)
+        )
+        (D.field "inputType" D.string)
+        (D.field "data" D.string)
+        (D.field "start" D.int)
+        (D.field "end" D.int)
   -- D.field 
   -- |> D.map
   --   (\input ->
@@ -630,17 +633,21 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
   case model.mode of
     Waiting ->
-      Browser.Events.onKeyDown
-        ( D.field "key" D.string
-        |> D.map
-          (\key ->
-            if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
-            else NoOp
+      Sub.batch
+        [ Browser.Events.onKeyDown
+          ( D.field "key" D.string
+          |> D.map
+            (\key ->
+              if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
+              else NoOp
+            )
           )
-        )
+        , Time.every 60000 Tick
+        ]
     AwesomeBar state ->
       Sub.batch
-        [ Ports.awesomeBarInput (D.decodeValue (decodeInput model state) >> Result.withDefault NoOp)
+        [ Ports.awesomeBarInput
+            (D.decodeValue (decodeInput model) >> Result.withDefault NoOp)
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
         , Ports.sendSpecial decodeSpecialKey
         , Ports.caretMoved
@@ -651,10 +658,11 @@ subscriptions model =
                   if i == state.i then
                     NoOp
                   else
-                    (AB (CaretMoved i))
+                    (AB <| CaretMoved i)
                 )
               |> Result.withDefault NoOp
             )
+        , Time.every 60000 Tick
         ]
 
 -- PROGRAM
