@@ -63,128 +63,144 @@ lastInputEvent = null;
 lastInputEvent_range = null;
 bar = null;
 textRange = null;
-caretTracker = 0; // this is SEPARATE from caretPosition.
-// 👆 this is used to tell Elm what JS sees as the caret position.  It will not
-// result in Elm forcing a change of caret position.
+caretTracker = { start: 0, end: 0 }; // this is SEPARATE from caretPosition.
+// 👆 this is used to tell Elm what JS sees as the caret position.
+// However, after updating the caret position manually, the caretTracker will be
+// updated as well to the manually-set value.
 
 let app = Elm.Main.init({
   node: document.getElementById('myapp'),
   flags: null
 });
 
-document.addEventListener("keyup", (e) => { checkCaretChange(); });
-document.addEventListener("mouseup", (e) => { checkCaretChange(); });
+const caretChangingKeys = new Set([
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+]);
+document.addEventListener("keyup", (e) => {
+  // When insertions, deletions, pastes, composition, etc happens,
+  // I can rely on Elm to give back the correct caret position, so all is well.
+  // However, when the user moves the caret around with specific keys,
+  // I need to inform Elm about that.
+  if (caretChangingKeys.has(e.key)) {
+    e.stopPropagation();
+    console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
+    checkCaretChange();
+  }
+});
+document.addEventListener("mouseup", (e) => { e.stopPropagation(); checkCaretChange(); });
+document.addEventListener("selectionchange", (e) => {
+  if (document.activeElement.id !== "awesomebar") {
+    return;
+  }
+  console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
+  checkCaretChange();
+});
 
-function setCaretPosition() {
-  const children = Array.from(bar.childNodes);
-  var char_count = caretPosition;
-  for (const child of children) {
-    if (child.nodeType == Node.ELEMENT_NODE && child.dataset.completion !== undefined) {
+function countForwardsTo(char_count) {
+  for (var current = bar.firstChild; current; current = current.nextSibling) {
+    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
       // skip over completions.
       continue;
     }
-    console.log(child);
-    this_length = child.textContent.length;
-    if (char_count - this_length <= 0) { // we've reached the right place!
-      let offset = char_count;
-      let s = document.getSelection();
-      let txt = child.childNodes[0]; // this would be a TEXT node.
-      textRange = document.createRange();
-      textRange.setStart(txt, offset);
-      textRange.collapse(true);
-      s.removeAllRanges();
-      s.addRange(textRange);
+    // console.log(current);
+    let len = current.textContent.length;
+    if (char_count - len <= 0) {
+      return { node: current, offset: char_count };
     }
-    char_count -= this_length;
+    char_count -= len;
   }
+  return char_count;
 }
 
-_debug_getCaretPosition_f = null;
-_debug_getCaretPosition_a = null;
+function setCaretPosition() {
+  console.log(`Setting caret position to ${caretPosition}`);
+  let s = document.getSelection();
+  let { node, offset } = countForwardsTo(caretPosition);
+  let r = document.createRange();
+  r.setStart(textNodeIn(node), offset);
+  s.removeAllRanges();
+  s.addRange(r);
+  s.collapseToStart();
+  // caretTracker = { start: caretPosition, end: caretPosition };
+}
 
-// We have one of these cases:
-// div#awesomebar > div > span > text
-// OR
-// div#awesomebar > div > text
-function getCaretPositions() {
-  const selection = window.getSelection();
-  let getFocusPosition = () => {
-    // find the node with focus.
-    const focused = selection.focusNode;
-    if (focused === null) return -1;
-    const offset = selection.focusOffset;
-    // if this is a text-node, then the awesomebar must be two levels up.
-    var focused_child;
-    // case: div#awesomebar > div > text
-    if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.id === "awesomebar") {
-      focused_child = focused;
-    // case: div #awesomebar > div > span > text
-    } else if (focused.nodeType == Node.TEXT_NODE && focused.parentNode.parentNode.parentNode.id === "awesomebar") {
-      focused_child = focused.parentNode;
-    } else {
-      console.log("FOCUS: Where is this node?  I don't know.  See _debug_getCaretPosition_f.");
-      _debug_getCaretPosition_f = focused;
-      console.log(focused);
-      return -1;
+function countBackwardsFrom(node, char_count) {
+  for (var current = node; current; current = current.previousSibling) {
+    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
+      // skip over completions.
+      continue;
     }
-    // Now get the very first child of the awesomebar, counting chars on the way.
-    var char_count = offset;
-    for (var current = focused_child.previousSibling; current; current = current.previousSibling) {
-      if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-        // skip over completions.
-        continue;
-      }
-      console.log(current);
-      char_count += current.textContent.length;
-    }
-    // assign!
-    return char_count;
+    // console.log(current);
+    char_count += current.textContent.length;
   }
-  let focus = getFocusPosition();
-  let getAnchorPosition = () => {
-    // okay.  Now, get the anchor offset.  The anchor doesn't move, but the focus does.
-    // Together, they will give me the real range within the string.
-    if (selection.isCollapsed) {
-      return focus; // the two are the same.
-    }
-    // find the node with focus.
-    const anchor = selection.anchorNode;
-    if (anchor === null) return -1;
-    const offset = selection.anchorOffset;
-    // if this is a text-node, then the awesomebar must be two levels up.
-    var anchor_child;
-    // case: div#awesomebar > div > text
-    if (anchor.nodeType == Node.TEXT_NODE && anchor.parentNode.parentNode.id === "awesomebar") {
-      anchor_child = anchor;
-    // case: div #awesomebar > div > span > text
-    } else if (anchor.nodeType == Node.TEXT_NODE && anchor.parentNode.parentNode.parentNode.id === "awesomebar") {
-      anchor_child = anchor.parentNode;
-    } else {
-      console.log("ANCHOR: Where is this node?  I don't know.  See _debug_getCaretPosition_a.");
-      _debug_getCaretPosition_a = anchor;
-      console.log(anchor);
-      return -1;
-    }
-    // Now get the very first child of the awesomebar, counting chars on the way.
-    var char_count = offset;
-    for (var current = anchor_child.previousSibling; current; current = current.previousSibling) {
-      if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
-        // skip over completions.
-        continue;
-      }
-      console.log(current);
-      char_count += current.textContent.length;
-    }
-    // assign!
-    return char_count;
-  };
-  let anchor = getAnchorPosition();
+  return char_count;
+}
 
-  // give back the start and end
-  if (focus === -1 || anchor === -1) {
+function countNodesForwards(node, count) {
+  var char_count = 0;
+  for (var i = 0, current = node.firstChild; i < count && current; i++, current = current.nextSibling) {
+    if (current.nodeType == Node.ELEMENT_NODE && current.dataset.completion !== undefined) {
+      // skip over completions.
+      continue;
+    }
+    char_count += current.textContent.length;
+  }
+  return char_count;
+}
+
+function getCaretPosition(selection, getNode, getOffset) {
+  // right!
+  // Now, the focusNode can be a few things:
+  // 1. A text node
+  // 2. A span node
+  // 3. The awesomebar itself
+  // 4. The awesomebar-container
+  // We'll handle each of these cases in turn.
+  let node = getNode(selection);
+  let offset = getOffset(selection);
+  if (node.nodeType === Node.TEXT_NODE) {
+    // Two cases here:
+    // 1. It might be a text-node within a <span>
+    // 2. It might be a text-node within the awesomebar itself
+    if (node.parentNode.tagName === "SPAN") {
+      // Case 1: Get the parent of this, and work backwards from it.
+      return countBackwardsFrom(node.parentNode.previousSibling, offset);
+    } else {
+      // Case 2: Work backwards from previous nodes within the awesomebar.
+      return countBackwardsFrom(node.previousSibling, offset);
+    }
+  }
+  if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
+    return countBackwardsFrom(node.previousSibling, 0);
+  }
+  // for cases #3 & #4, count `offset` nodes forward.
+  if (node.id === "awesomebar") {
+    return countNodesForwards(bar, offset);
+  }
+  console.log(`ERROR in getCaretPosition?? I don't know what to do with this node👇`);
+  console.log(node);
+  return null;
+  //return countBackwardsFrom(bar.lastChild ? bar.lastChild.previousSibling : null, 0);
+}
+// We have one of these cases:
+// div#awesomebar span > text
+// OR
+// div#awesomebar > text
+function getCaretPositions() {
+  console.log(`Updating caret position, '${bar.textContent}'`);
+  if (document.activeElement.id !== "awesomebar") {
+    console.log("Active element is NOT the awesomebar, it is 👇");
+    console.log(document.activeElement);
     return null;
   }
-  return { start: Math.min(focus, anchor), end: Math.max(focus, anchor) };
+  let selection = window.getSelection();
+  if (selection.isCollapsed) {
+    let v = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
+    return { start: v, end: v };
+  }
+  let a = getCaretPosition(selection, (sel) => sel.anchorNode, (sel) => sel.anchorOffset);
+  let b = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
+  return { start: Math.min(a, b), end: Math.max(a, b) };
 }
 
 function checkCaretChange() {
@@ -221,6 +237,7 @@ function trackCompositionEnd(e) {
 }
 
 function beforeInputListener(event) {
+  event.stopPropagation();
   if (event.inputType.match("^history..do")) {
     return; // don't handle this.
   }
@@ -289,31 +306,43 @@ function beforeInputListener(event) {
   }
 }
 
-// function setCaretPosition(textNode) {
-//     let s = document.getSelection();
-//     textRange = document.createRange();
-//     textRange.setStart(textNode, caretPosition);
-//     textRange.collapse(true);
-//     s.removeAllRanges();
-//     s.addRange(textRange);
-// };
-
 function textNodeIn(node) {
   if (node.nodeType === Node.TEXT_NODE) {
+    // console.log(`Returning node ${node} with nodeType ${node.nodeType}, wanted ${Node.TEXT_NODE}`);
     return node;
   }
-  return Array.from(node.childNodes).find(textNodeIn);
+  var stack = [node];
+  while (stack.length > 0) {
+//    console.log(stack);
+    var current = stack.pop();
+    for (var i = 0; i < current.childNodes.length; i++) {
+      if (current.childNodes[i].nodeType === Node.TEXT_NODE) {
+        // console.log(`Returning node ${current.childNodes[i]} with nodeType ${current.childNodes[i].nodeType} (wanted ${Node.TEXT_NODE})`);
+        return current.childNodes[i];
+      } else {
+        stack.push(current.childNodes[i]);
+      }
+    }
+  }
+  console.log("Nothing, null'ing out.");
+  return null;
 }
 
 // Callback function to execute when mutations are observed
 const observation = (mutationList, _observer) => {
   for (const mutation of mutationList) {
+    //console.log(mutation);
     const arr = Array.from(mutation.addedNodes);
     if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
-      // console.log(`A child node has been added or removed within ${mutation.target.id}`);
+      console.log(`A child node has been added or removed within ${mutation.target.id}`);
       // console.log(mutation.removedNodes);
       // console.log(mutation.addedNodes);
       // setCaretPosition(textNodeIn(mutation.addedNodes[0]));
+      setCaretPosition();
+      return;
+    }
+    if (mutation.type == "characterData") {
+      console.log(`Character data has changed within ${mutation.target.parentNode.tagName} ${mutation.target.parentNode.id}, now '${mutation.target.textContent}'`);
       setCaretPosition();
       return;
     }
@@ -327,7 +356,6 @@ function goodbyeBar() {
   bar.removeEventListener("beforeinput", beforeInputListener);
   bar.removeEventListener("compositionstart", trackCompositionStart);
   bar.removeEventListener("compositionend", trackCompositionEnd);
-  bar.removeEventListener("caret", checkCaretChange);
   observer.disconnect();
   // reset all the state-tracking variables
   textRange = null;
@@ -335,7 +363,7 @@ function goodbyeBar() {
   isComposing = false;
   caretPosition = 0;
   lastInputEvent = null;
-  caretTracker = 0;
+  caretTracker = { start: 0, end: 0 };
   // Tell Elm that it can now get rid of the element
   app.ports.listenerRemoved.send(null);
 }
@@ -349,16 +377,21 @@ function initializeBar() {
   bar.addEventListener("beforeinput", beforeInputListener);
   bar.addEventListener("compositionstart", trackCompositionStart);
   bar.addEventListener("compositionend", trackCompositionEnd);
-  bar.addEventListener("caret", checkCaretChange);
   bar.focus();
 
   // Start observing the target node for configured mutations
-  observer.observe(bar, { characterData: true, childList: true, subtree: false });
+  observer.observe(bar, { characterData: true, childList: true, subtree: true });
 }
 
 app.ports.displayAwesomeBar.subscribe(initializeBar);
 app.ports.hideAwesomeBar.subscribe(goodbyeBar);
 
 app.ports.shiftCaret.subscribe((p) => {
+  console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
   caretPosition = p;
+  caretTracker = { start: caretPosition, end: caretPosition };
+  if (bar.textContent.length >= p) {
+    // go ahead & invoke now.
+    setCaretPosition();
+  }
 });

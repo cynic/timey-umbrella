@@ -15,6 +15,7 @@ import Platform.Cmd as Cmd
 import String.Extra as String
 import Ports
 import Html.Keyed as Keyed
+import Html.Attributes exposing (tabindex)
 
 -- MODEL
 
@@ -275,7 +276,7 @@ tokenise s i current acc =
 -- UPDATE
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case msg of
+  case Debug.log "MESSAGE" msg of
   NoOp ->
     (model, Cmd.none)
   SwitchMode (AwesomeBar x) ->
@@ -314,7 +315,7 @@ update msg model =
                     , parse = parse tokens s []
                     }
               }
-            , Ports.shiftCaret i
+            , Ports.shiftCaret (Debug.log "Requesting caret shift to" i)
             )
       Waiting ->
         (model, Cmd.none)
@@ -326,6 +327,30 @@ classFor token =
     Today -> "when"
     Tomorrow -> "when"
     Description -> ""
+
+tokenToView : String -> Int -> (Token, Maybe String, Offset) -> Html Msg
+tokenToView s caretPosition (token, completion, {offset, extent}) =
+  span
+    [ classList
+        [ ("token-viz", token /= Description)
+        , (classFor token, token /= Description)
+        ]
+    ]
+    [ text <| String.slice offset (offset+extent) s
+    , if caretPosition > offset && caretPosition <= offset + extent then
+        Maybe.map (\completion_ ->
+          span
+            [ class "completion"
+            , contenteditable False
+            , Html.Attributes.attribute "inert" "true"
+            , Html.Attributes.attribute "data-completion" completion_
+            ]
+            [ text completion_ ]
+        ) completion
+        |> Maybe.withDefault (text "")
+      else
+        text ""
+    ]
 
 view : Model -> Browser.Document Msg
 view model =
@@ -340,28 +365,58 @@ view model =
         div
           []
           [ Keyed.node "div"
-              [ id "awesomebar-container" ]
+              [ id "awesomebar-container"
+              ]
               [ ("title", div
                 [ id "awesomebar-title" ]
                 [ text "Task" ])
-              , ("bar", Keyed.node "div"
-                [ contenteditable True
-                , id "awesomebar"
-                ]
-                [ ( state.s
-                  , div
-                      []
-                      [ text <| {-Debug.log "Generating TEXT node"-} state.s
-                      , span
-                          [ contenteditable False
-                          , class "completion"
-                          , Html.Attributes.attribute "data-completion" "blah"
-                          ]
-                          [ text "blah" ]
-                      , text "and the end"
-                      ]
+              -- this next bit is keyed to a constant just to stop Elm from recreating the element.
+              -- If Elm DOES recreate the element, the events associated with it externally… disappear!
+              , ("bar", div
+                  [ contenteditable True
+                  , id "awesomebar"
+                  ]
+                  ( let
+                      last = List.drop (List.length state.parse - 1) state.parse |> List.head
+                      first = List.head state.parse
+                      prefix =
+                        Maybe.map (\(_, _, { offset }) ->
+                          text <| String.repeat offset " "
+                        ) first
+                      suffix =
+                        Maybe.map (\(_, _, { offset, extent }) ->
+                          text <| String.repeat (String.length state.s - (offset + extent)) " "
+                        ) last
+                      tokenHtml =
+                        List.map (tokenToView state.s state.i) state.parse
+                    in
+                      case (prefix, suffix) of
+                        (Nothing, Nothing) ->
+                          tokenHtml
+                        (Just prefixHtml, Nothing) ->
+                          prefixHtml :: tokenHtml
+                        (Nothing, Just suffixHtml) ->
+                          tokenHtml ++ [suffixHtml]
+                        (Just prefixHtml, Just suffixHtml) ->
+                          (prefixHtml :: tokenHtml) ++ [suffixHtml]
                   )
-                ])
+                )
+
+
+                -- [ ( state.s
+                --   , div
+                --       []
+                --       [ text <| {-Debug.log "Generating TEXT node"-} state.s
+                --       , span
+                --           [ contenteditable False
+                --           , class "completion"
+                --           , Html.Attributes.attribute "data-completion" "blah"
+                --           ]
+                --           [ text "blah" ]
+                --       , text "and the end"
+                --       ]
+                --   )
+                -- ])
               ]
           , div
             []
@@ -579,7 +634,7 @@ subscriptions model =
         ( D.field "key" D.string
         |> D.map
           (\key ->
-            if key == " " then SwitchMode (AwesomeBar { s = "Hello, world!", i = 0, parse = [], tokenised = [] })
+            if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
             else NoOp
           )
         )
@@ -588,7 +643,18 @@ subscriptions model =
         [ Ports.awesomeBarInput (D.decodeValue (decodeInput model state) >> Result.withDefault NoOp)
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
         , Ports.sendSpecial decodeSpecialKey
-        , Ports.caretMoved (D.decodeValue (D.field "start" D.int) >> Result.map (CaretMoved >> AB) >> Result.withDefault NoOp)
+        , Ports.caretMoved
+            (\input ->
+              D.decodeValue (D.field "start" D.int) input
+              |> Result.map
+                (\i ->
+                  if i == state.i then
+                    NoOp
+                  else
+                    (AB (CaretMoved i))
+                )
+              |> Result.withDefault NoOp
+            )
         ]
 
 -- PROGRAM
