@@ -93,6 +93,8 @@ document.addEventListener("mouseup", (e) => {
   }
   e.stopPropagation();
   checkCaretChange();
+  caretPosition = caretTracker.start;
+  setCaretPosition();
 });
 document.addEventListener("selectionchange", (e) => {
   if (document.activeElement.id !== "awesomebar") {
@@ -132,7 +134,8 @@ function countForwardsTo(char_count) {
 function setCaretPosition() {
   //console.log(`Setting caret position to ${caretPosition}`);
   let s = document.getSelection();
-  let { node, offset } = countForwardsTo(caretPosition);
+  let totalLen = userTextLength();
+  let { node, offset } = countForwardsTo(Math.min(totalLen, caretPosition));
   let r = document.createRange();
   r.setStart(textNodeIn(node), offset);
   s.removeAllRanges();
@@ -222,8 +225,8 @@ function checkCaretChange() {
   if (bar === null) {
     return;
   }
-  const old = caretTracker;
-  const tmp = getCaretPositions();
+  let old = caretTracker;
+  let tmp = getCaretPositions();
   if (tmp) {
     caretTracker = tmp;
     // console.log(caretTracker);
@@ -403,9 +406,10 @@ app.ports.hideAwesomeBar.subscribe(goodbyeBar);
 
 app.ports.shiftCaret.subscribe((p) => {
   // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
+  const totalLen = userTextLength();
   caretPosition = p;
   caretTracker = { start: caretPosition, end: caretPosition };
-  if (userTextLength() >= p) {
+  if (totalLen >= p) {
     // go ahead & invoke now.
     setCaretPosition();
   }
