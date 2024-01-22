@@ -133,6 +133,31 @@ document.addEventListener("keyup", (e) => {
     e.stopPropagation();
     // console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
     checkCaretChange();
+    caretPosition = caretTracker.start;
+    // there is an interesting edge-case here.
+    // If we are moving right ✅
+    // AND we are at the end of a <span> ✅
+    // AND that span has a completion ✅
+    // AND there is a space directly to the right of us ✅
+    // THEN we should actually move the caret one more position to the right of the span (i.e. add 1 to it).
+    // (OR, if Ctrl+ArrowRight is pressed, we should move to the end of the span.)
+    // …and otherwise, everything works out quite normally.
+    // EDGE-CASE STUFF
+    if (e.key === "ArrowRight") {
+      let sel = document.getSelection();
+      let range = sel.getRangeAt(0);
+      let node = range.endContainer;
+      let ofs = range.endOffset;
+      if (ofs === 0 && node.nodeType === Node.TEXT_NODE && node.textContent.length > 0 && node.textContent.trim() === "") {
+        let prev = node.previousSibling || node.parentNode.previousSibling; // if in a span.
+        if (prev && prev.nodeType === Node.ELEMENT_NODE && prev.tagName === "SPAN" && prev.dataset.completionlen !== undefined) {
+            console.log("Edge case: moving +1 space right from end of span");
+            caretPosition += 1;
+        }
+      }
+    }
+    // END EDGE-CASE STUFF
+    setCaretPosition();
   }
 });
 document.addEventListener("mouseup", (e) => {
