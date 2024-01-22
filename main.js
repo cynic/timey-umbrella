@@ -38,7 +38,7 @@ position (i.e. 0).
 2. If not, can I at least detect it and/or correct it?
 
 Yes.  I've changed the design:
-("bar", Keyed.node "
+
   1. The `awesomeBarInput` functionality is invoked.  This happens immediately,
      as a function call.  All good.
 
@@ -55,6 +55,54 @@ Yes.  I've changed the design:
 
 There is much less time taken between (3) and (4), so to the user, the caret
 position seems to always be correct.
+*/
+
+/* Update: seems that rumors of the death of input bugs were (slightly) exaggerated.
+
+During quick-typing, things could still go wrong.
+
+WORKING:
+1. insert (via beforeInputListener)
+2. DOM CHANGES HAPPEN
+3. mutation-observer
+   `- if I try to get caret position in the observer, it is INCORRECT!
+4. set caret position
+5. update caret position (via keyup?)
+
+But when I type too quickly, this happens:
+
+NOT WORKING:
+1. insert (via beforeInputListener)
+2. DOM CHANGES HAPPEN
+3. mutation-observer
+4. set caret position
+5. ***** insert (via beforeInputListener) INTO THE INCORRECT POSITION
+6. mutation-observer
+7. set caret position (BUT THIS WILL BE INCORRECT!)
+8. update caret position (via keyup?)
+
+The problem actually occurs in two ways:
+  (A) the update-caret-position doesn't occur before the insert, so the insert
+      is in the wrong place.
+  (B) the update-caret-position occurs AFTER the insert but BEFORE DOM changes
+      have occurred, thus overwriting the correct caret position sent from Elm and
+      priming the next insert to occur at the incorrect place.
+
+I've changed the design:
+
+1. insert (via beforeInputListener)
+   `- message sent to Elm
+2. Shift-caret message sent from Elm to JS
+   '- IF DOM changes have happened already, setCaretPostion() NOW. Otherwise, record & wait.
+3. DOM CHANGES HAPPEN
+4. mutation-observer
+5. set caret position
+
+More than the ordering, as well:
+- The update-caret-position only happens if certain keys are pressed or the mouse is clicked
+  and the awesomebar is active.  This assists greatly with (B).
+
+It seems (on FF, 22 January 2024) to be quite reliable now. So let's see, in sha Allah…
 */
 
 caretPosition = 0; // this is set via the `shiftCaret` port
