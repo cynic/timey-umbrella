@@ -275,6 +275,24 @@ tokenise s i current acc =
     (_, Just c) ->
       tokenise s (i+1) (Just { c | extent = c.extent + 1 }) acc
 
+updateSetString : String -> Int -> AwesomeBarState -> Model -> (Model, Cmd Msg)
+updateSetString s i x model =
+  ( { model
+    | mode =
+      let
+        tokens = tokenise s 0 Nothing []
+      in
+        AwesomeBar
+          { x
+          | s = s
+          , i = i
+          , tokenised = tokens
+          , parse = parse tokens s []
+          }
+    }
+  , Ports.shiftCaret ({-Debug.log "Requesting caret shift to"-} i)
+  )
+
 -- UPDATE
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -296,7 +314,29 @@ update msg model =
           Key Escape ->
             (model, Ports.hideAwesomeBar ())
           Key Tab ->
-            (model, Cmd.none)
+            -- Plausibly, this is means "complete the current token".
+            x.parse
+            |> List.filterMap
+                (\(_, completion, {offset, extent} as ofs) ->
+                  Maybe.andThen
+                    (\completion_ ->
+                      if x.i |> isWithinOffset offset extent then
+                        Just (completion_, ofs)
+                      else
+                        Nothing
+                    )
+                    completion
+                )
+            |> List.head
+            |> Maybe.map
+                (\(completion, {offset, extent}) ->
+                  let
+                    s = String.left (offset + extent) x.s ++ completion ++ String.dropLeft (offset + extent) x.s
+                    i = offset + extent + String.length completion
+                  in
+                    model |> updateSetString s i x
+                )
+            |> Maybe.withDefault (model, Cmd.none)
           Key Enter ->
             (model, Cmd.none)
           CaretMoved i ->
@@ -306,21 +346,7 @@ update msg model =
             , Cmd.none
             )
           SetString s i ->
-            ( { model
-              | mode =
-                let
-                  tokens = tokenise s 0 Nothing []
-                in
-                  AwesomeBar
-                    { x
-                    | s = s
-                    , i = i
-                    , tokenised = tokens
-                    , parse = parse tokens s []
-                    }
-              }
-            , Ports.shiftCaret ({-Debug.log "Requesting caret shift to"-} i)
-            )
+            model |> updateSetString s i x
       Waiting ->
         (model, Cmd.none)
 
@@ -361,13 +387,16 @@ tokenWithCompletion s token completion txt =
         [ text completion ]
     ]
   
+isWithinOffset : Int -> Int -> Int -> Bool
+isWithinOffset offset extent caretPosition =
+  offset <= caretPosition && offset + extent >= caretPosition
 
 tokenToView : String -> Int -> (Token, Maybe String, Offset) -> Html Msg
 tokenToView s caretPosition (token, completion, {offset, extent}) =
   let
     txt = String.slice offset (offset+extent) s
   in
-    case (completion, offset <= caretPosition && offset + extent >= caretPosition) of
+    case (completion, caretPosition |> isWithinOffset offset extent) of
       (Nothing, _) ->
         tokenWithoutCompletion s token txt
       (_, False) ->

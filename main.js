@@ -162,6 +162,7 @@ document.addEventListener("keyup", (e) => {
     }
   }
 });
+
 document.addEventListener("mouseup", (e) => {
   if (document.activeElement.id !== "awesomebar") {
     return true;
@@ -175,12 +176,27 @@ document.addEventListener("mouseup", (e) => {
     setCaretPosition();
   }
 });
+
 document.addEventListener("selectionchange", (e) => {
   if (document.activeElement.id !== "awesomebar") {
     return true;
   }
   // console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
   checkCaretChange();
+});
+
+const specialKeys = new Set([
+  "Tab", "Enter", "Escape", "ArrowDown", "ArrowUp"
+]);
+document.addEventListener("keydown", (e) => {
+  if (document.activeElement.id !== "awesomebar") {
+    return true;
+  }
+  if (specialKeys.has(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
+    app.ports.sendSpecial.send(e.key);
+  }
 });
 
 function userTextLength() {
