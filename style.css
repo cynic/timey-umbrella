@@ -50,3 +50,14 @@ body {
 .when {
   background-color: khaki;
 }
+
+.todo-created {
+  background-color: lightgreen;
+  margin-left: 1ex;
+  padding: 2px;
+}
+
+.todo-text {
+  text-decoration: underline;
+  font-style: italic;
+}

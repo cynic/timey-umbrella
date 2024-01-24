@@ -1,21 +1,20 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, div, text, span)
+import Html exposing (Html, div, text, span, li, ol)
 import Browser.Navigation as Navigation
 import Url exposing (Url)
-import Time exposing (Posix)
+import Time
 import Browser.Events
 import Json.Decode as D
 import Html.Attributes exposing (contenteditable, id, class, classList)
-import Browser.Dom as Dom
-import Task
-import Html.Events exposing (on, preventDefaultOn)
 import Platform.Cmd as Cmd
 import String.Extra as String
 import Ports
 import Html.Keyed as Keyed
-import Html.Attributes exposing (tabindex)
+import Platform.Cmd as Cmd
+import Task
+import Time.Extra as Time
 
 -- MODEL
 
@@ -25,45 +24,45 @@ type alias Date =
   , day : Int
   }
 
-type alias RoughInterval =
-  (Int, Int) -- e.g. roughly every 5-8 days/minutes/etc
+-- type alias RoughInterval =
+--   (Int, Int) -- e.g. roughly every 5-8 days/minutes/etc
 
-type Pause
-  = Indefinitely { since : Date }
-  | Approximately RoughInterval -- measured in days
+-- type Pause
+--   = Indefinitely { since : Date }
+--   | Approximately RoughInterval -- measured in days
 
-type TimeExpenditure
-  -- just unknown
-  = Undefined
-  | About RoughInterval -- measured in minutes/hours depending on suffix
+-- type TimeExpenditure
+--   -- just unknown
+--   = Undefined
+--   | About RoughInterval -- measured in minutes/hours depending on suffix
 
-type DeadlineTypes
-  -- this is the deadline by which the thing MUST be done.  Usually set by other people…
-  = HardDeadline Date
-  -- now, this is a "deadline" by which I kind of want to have it done, and there's a hard deadline too by which it MUST be done
-  | SoftDeadline Date Date
-  -- I want to have done some of this done just to keep some form of forward-progress, but when it's actually done is unknown.  Maybe never?
-  | ForwardProgress 
+-- type DeadlineTypes
+--   -- this is the deadline by which the thing MUST be done.  Usually set by other people…
+--   = HardDeadline Date
+--   -- now, this is a "deadline" by which I kind of want to have it done, and there's a hard deadline too by which it MUST be done
+--   | SoftDeadline Date Date
+--   -- I want to have done some of this done just to keep some form of forward-progress, but when it's actually done is unknown.  Maybe never?
+--   | ForwardProgress 
 
-type Status
-  = Active
-  | Completed Posix
-  | Paused { previously : Status, now : Status }
-  | BallPlayed { checkAfter : RoughInterval } -- in days
+-- type Status
+--   = Active
+--   | Completed Posix
+--   | Paused { previously : Status, now : Status }
+--   | BallPlayed { checkAfter : RoughInterval } -- in days
 
-type alias Todo =
-  { created : Date
-  , text : String
-  , status : Status
-  , spawnContext : Maybe String -- can be an event, a person, a todo
-  }
+-- type alias Todo =
+--   { created : Date
+--   , text : String
+--   , status : Status
+--   , spawnContext : Maybe String -- can be an event, a person, a todo
+--   }
 
-type CoreDatum
-  = Start
+-- type CoreDatum
+--   = Start
 
-type alias CoreDatumModel =
-  { 
-  }
+-- type alias CoreDatumModel =
+--   {
+--   }
 
 -- AwesomeBar start
 type Token
@@ -95,6 +94,8 @@ type ABSpecialKey
   = Escape
   | Tab
   | Enter
+  | ArrowDown
+  | ArrowUp
 
 type ABMsg
   = SetString String Int
@@ -106,21 +107,50 @@ type Msg
   = NoOp
   | SwitchMode Mode
   | AB ABMsg
-  | Tick Posix
+  | Tick Time.Posix
+  | GetZone Time.Zone
+
+type alias Todo =
+  { s : String
+  , created : Date
+  }
 
 type alias Model =
   { key : Navigation.Key
   , mode : Mode
-  , nowish : Posix
+  , nowish : Time.Posix
+  , zone : Time.Zone
+  , data : List Todo
   }
+
+toMonth : Time.Zone -> Time.Posix -> Int
+toMonth zone time =
+  case Time.toMonth zone time of
+    Time.Jan -> 1
+    Time.Feb -> 2
+    Time.Mar -> 3
+    Time.Apr -> 4
+    Time.May -> 5
+    Time.Jun -> 6
+    Time.Jul -> 7
+    Time.Aug -> 8
+    Time.Sep -> 9
+    Time.Oct -> 10
+    Time.Nov -> 11
+    Time.Dec -> 12
 
 init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ _ key =
   ( { key = key
   , mode = Waiting
   , nowish = Time.millisToPosix 0
+  , zone = Time.utc -- for now, 'cos I'm lazy
+  , data = []
   }
-  , Cmd.none
+  , Cmd.batch
+    [ Task.perform GetZone Time.here
+    , Task.perform Tick Time.now
+    ]
   )
 
 {-
@@ -338,6 +368,22 @@ update msg model =
                 )
             |> Maybe.withDefault (model, Cmd.none)
           Key Enter ->
+            ( { model
+              | mode = Waiting
+              , data =
+                  { s = x.s
+                  , created =
+                    { year = Time.toYear model.zone model.nowish
+                    , month = toMonth model.zone model.nowish
+                    , day = Time.toDay model.zone model.nowish
+                    }
+                  } :: model.data
+              }
+            , Cmd.none
+            )
+          Key ArrowDown ->
+            (model, Cmd.none)
+          Key ArrowUp ->
             (model, Cmd.none)
           CaretMoved i ->
             ( { model
@@ -349,6 +395,8 @@ update msg model =
             model |> updateSetString s i x
       Waiting ->
         (model, Cmd.none)
+  GetZone zone ->
+    ( { model | zone = zone }, Cmd.none )
 
 -- VIEW
 classFor : Token -> String
@@ -404,6 +452,69 @@ tokenToView s caretPosition (token, completion, {offset, extent}) =
       (Just completion_, True) ->
         tokenWithCompletion s token completion_ txt
 
+viewTodoList : Model -> Html Msg
+viewTodoList model =
+  ol
+    []    
+    ( List.map
+      (\{ s, created } ->
+        li
+          [ class "todo" ]
+          [ span
+              [ class "todo-text" ]
+              [ text s ]
+          , span
+              [ class "todo-created" ]
+              [ text <| "Created " ++ String.fromInt created.year ++ "-" ++ String.fromInt created.month ++ "-" ++ String.fromInt created.day ]
+          ]
+      )
+      model.data
+    )
+
+viewAwesomeBar : Model -> AwesomeBarState -> Html Msg
+viewAwesomeBar model state =
+  div
+    []
+    [ Keyed.node "div"
+        [ id "awesomebar-container"
+        ]
+        [ ("title", div
+          [ id "awesomebar-title" ]
+          [ text "Task" ])
+        -- this next bit is keyed to a constant just to stop Elm from recreating the element.
+        -- If Elm DOES recreate the element, the events associated with it externally… disappear!
+        , ("bar", div
+            [ contenteditable True
+            , id "awesomebar"
+            ]
+            ( let
+                last = List.drop (List.length state.parse - 1) state.parse |> List.head
+                first = List.head state.parse
+                prefix =
+                  Maybe.map (\(_, _, { offset }) ->
+                    text <| String.repeat offset " "
+                  ) first
+                suffix =
+                  Maybe.map (\(_, _, { offset, extent }) ->
+                    text <| String.repeat (String.length state.s - (offset + extent)) " "
+                  ) last
+                tokenHtml =
+                  List.map (tokenToView state.s state.i) state.parse
+              in
+                case (prefix, suffix) of
+                  (Nothing, Nothing) ->
+                    tokenHtml
+                  (Just prefixHtml, Nothing) ->
+                    prefixHtml :: tokenHtml
+                  (Nothing, Just suffixHtml) ->
+                    tokenHtml ++ [suffixHtml]
+                  (Just prefixHtml, Just suffixHtml) ->
+                    (prefixHtml :: tokenHtml) ++ [suffixHtml]
+            )
+          )
+        ]
+    ]
+
 view : Model -> Browser.Document Msg
 view model =
   { title = "Hello, Elm!"
@@ -412,88 +523,12 @@ view model =
       [ text "Hello, Elm!" ]
     , case model.mode of
       Waiting ->
-        div [] [ text "Waiting…" ]
+        viewTodoList model
       AwesomeBar state ->
         div
           []
-          [ Keyed.node "div"
-              [ id "awesomebar-container"
-              ]
-              [ ("title", div
-                [ id "awesomebar-title" ]
-                [ text "Task" ])
-              -- this next bit is keyed to a constant just to stop Elm from recreating the element.
-              -- If Elm DOES recreate the element, the events associated with it externally… disappear!
-              , ("bar", div
-                  [ contenteditable True
-                  , id "awesomebar"
-                  ]
-                  ( let
-                      last = List.drop (List.length state.parse - 1) state.parse |> List.head
-                      first = List.head state.parse
-                      prefix =
-                        Maybe.map (\(_, _, { offset }) ->
-                          text <| String.repeat offset " "
-                        ) first
-                      suffix =
-                        Maybe.map (\(_, _, { offset, extent }) ->
-                          text <| String.repeat (String.length state.s - (offset + extent)) " "
-                        ) last
-                      tokenHtml =
-                        List.map (tokenToView state.s state.i) state.parse
-                    in
-                      case (prefix, suffix) of
-                        (Nothing, Nothing) ->
-                          tokenHtml
-                        (Just prefixHtml, Nothing) ->
-                          prefixHtml :: tokenHtml
-                        (Nothing, Just suffixHtml) ->
-                          tokenHtml ++ [suffixHtml]
-                        (Just prefixHtml, Just suffixHtml) ->
-                          (prefixHtml :: tokenHtml) ++ [suffixHtml]
-                  )
-                )
-
-
-                -- [ ( state.s
-                --   , div
-                --       []
-                --       [ text <| {-Debug.log "Generating TEXT node"-} state.s
-                --       , span
-                --           [ contenteditable False
-                --           , class "completion"
-                --           , Html.Attributes.attribute "data-completion" "blah"
-                --           ]
-                --           [ text "blah" ]
-                --       , text "and the end"
-                --       ]
-                --   )
-                -- ])
-              ]
-          , div
-            []
-            ( List.map
-                (\{offset, extent} ->
-                  span
-                    []
-                    [ span
-                        [ class "token-viz" ]
-                        [ text <| String.fromInt offset
-                        , text "-"
-                        , text <| String.fromInt (offset + extent)
-                        , text " "
-                        , text "“"
-                        , text <| String.slice offset (offset+extent) state.s
-                        , text "”"
-                        ]
-                    , text " "
-                    ]
-                )
-                state.tokenised
-            )
-          , div
-            []
-            ( List.map (tokenToView state.s state.i) state.parse )
+          [ viewAwesomeBar model state
+          , viewTodoList model
           ]
     ]
   }
