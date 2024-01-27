@@ -15,6 +15,8 @@ import Html.Keyed as Keyed
 import Platform.Cmd as Cmd
 import Task
 import Time.Extra as Time
+import Parser exposing (Parser, (|.), (|=))
+import Parser
 
 -- MODEL
 
@@ -64,11 +66,16 @@ type alias Date =
 --   {
 --   }
 
+type SmallDuration
+  = Minutes Int
+  | Hours Int Int
+
 -- AwesomeBar start
 type Token
   = Today
   | Tomorrow
   | Description
+  | Duration SmallDuration
   -- | AcceptLiterally
   -- | Cursor
   -- | AfterDays Int
@@ -113,6 +120,7 @@ type Msg
 type alias Todo =
   { s : String
   , created : Date
+  , duration : Maybe SmallDuration
   }
 
 type alias Model =
@@ -160,6 +168,160 @@ These are all `List String -> Maybe (Token, String, Int)`, where
   - The `String` is the completion, if the caret is within or at the end
   - The `Int` is the number of `Offset`s consumed in the case of success
 -}
+
+-- The Parser.int function only parses integers that AREN'T suffixed with non-whitespace.
+-- Well, that's pretty useless to me!
+-- So, here's an actual intParser that is useful.
+intParser : (Maybe Int, Maybe Int) -> Parser Int
+intParser (min, max) =
+  Parser.getOffset
+  |> Parser.andThen (\ofs0 ->
+    Parser.chompWhile (Char.isDigit)
+    |> Parser.getChompedString
+    |> Parser.andThen (\value ->
+      Parser.getOffset
+      |> Parser.andThen (\ofs1 ->
+        if ofs1 > ofs0 then
+          String.toInt value
+          |> Maybe.map (\v ->
+            case (min, max) of
+              (Just min_, Just max_) ->
+                if v >= min_ && v <= max_ then
+                  Parser.succeed v
+                else
+                  Parser.problem ("Expected an integer between " ++ String.fromInt min_ ++ " and " ++ String.fromInt max_ ++ ", inclusive; got " ++ value)
+              (Just min_, Nothing) ->
+                if v >= min_ then
+                  Parser.succeed v
+                else
+                  Parser.problem ("Expected an integer greater than or equal to " ++ String.fromInt min_ ++ "; got " ++ value)
+              (Nothing, Just max_) ->
+                if v <= max_ then
+                  Parser.succeed v
+                else
+                  Parser.problem ("Expected an integer less than or equal to " ++ String.fromInt max_ ++ "; got " ++ value)
+              (Nothing, Nothing) ->
+                Parser.succeed v
+          )
+          |> Maybe.withDefault (Parser.problem ("Expected an integer, got " ++ value))
+        else
+          Parser.problem ("Expected an integer, but got a blank")
+      )
+    )
+  )
+
+x_dot_y_hParser : Int -> Parser (SmallDuration, Maybe String)
+x_dot_y_hParser initial =
+  -- syntax: 2.5h , 2.25h, 2.75h
+  Parser.succeed identity
+  |. Parser.symbol "."
+  |= Parser.oneOf
+    [ Parser.succeed 30 |. Parser.symbol "5"
+    , Parser.succeed 15 |. Parser.symbol "25"
+    , Parser.succeed 45 |. Parser.symbol "75"
+    ]
+  |> Parser.andThen (\final ->
+    Parser.oneOf
+      [ Parser.succeed (Hours initial final, Just "h")
+        |. Parser.end
+      , Parser.succeed (Hours initial final, Nothing)
+        |. Parser.symbol "h"
+        |. Parser.end
+      ]
+  )
+
+x_fraction_hParser : Int -> Parser (SmallDuration, Maybe String)
+x_fraction_hParser initial =
+  -- syntax: 2.5h , 2.25h, 2.75h
+  Parser.succeed identity
+  |= Parser.oneOf
+    [ Parser.succeed 30 |. Parser.symbol "½"
+    , Parser.succeed 15 |. Parser.symbol "¼"
+    , Parser.succeed 20 |. Parser.symbol "⅓"
+    , Parser.succeed 40 |. Parser.symbol "⅔"
+    , Parser.succeed 45 |. Parser.symbol "¾"
+    ]
+  |> Parser.andThen (\final ->
+    Parser.oneOf
+      [ Parser.succeed (Hours initial final, Just "h")
+        |. Parser.end
+      , Parser.succeed (Hours initial final, Nothing)
+        |. Parser.symbol "h"
+        |. Parser.end
+      ]
+  )
+
+x_hmParser : Int -> Parser (SmallDuration, Maybe String)
+x_hmParser initial =
+  -- syntax: 18m, 1h, etc
+  -- syntax: 2h30m 2h10m, etc
+  Parser.succeed identity
+  |= Parser.oneOf
+    [ Parser.end
+      |> Parser.andThen (\_ ->
+        if initial >= 5 then
+          Parser.succeed (Minutes initial, Just "m")
+        else
+          Parser.succeed (Hours initial 0, Just "h")
+      )
+    , Parser.succeed (Minutes initial, Nothing) |. Parser.symbol "m" |. Parser.end
+    , Parser.succeed (\(final, completion) -> (Hours initial final, completion))
+      |. Parser.symbol "h"
+      |= Parser.oneOf
+        [ Parser.succeed (0, Nothing) |. Parser.end
+
+        , Parser.succeed (5,  Nothing) |. Parser.symbol "5m"  |. Parser.end
+        , Parser.succeed (5,  Nothing) |. Parser.symbol "05m" |. Parser.end
+        , Parser.succeed (10, Nothing) |. Parser.symbol "10m" |. Parser.end
+        , Parser.succeed (15, Nothing) |. Parser.symbol "15m" |. Parser.end
+        , Parser.succeed (20, Nothing) |. Parser.symbol "20m" |. Parser.end
+        , Parser.succeed (25, Nothing) |. Parser.symbol "25m" |. Parser.end
+        , Parser.succeed (30, Nothing) |. Parser.symbol "30m" |. Parser.end
+        , Parser.succeed (35, Nothing) |. Parser.symbol "35m" |. Parser.end
+        , Parser.succeed (40, Nothing) |. Parser.symbol "40m" |. Parser.end
+        , Parser.succeed (45, Nothing) |. Parser.symbol "45m" |. Parser.end
+        , Parser.succeed (50, Nothing) |. Parser.symbol "50m" |. Parser.end
+        , Parser.succeed (55, Nothing) |. Parser.symbol "55m" |. Parser.end
+
+        , Parser.succeed (5, Just "m") |. Parser.symbol "5" |. Parser.end
+        , Parser.succeed (5, Just "m") |. Parser.symbol "05" |. Parser.end
+        , Parser.succeed (10, Just "m") |. Parser.symbol "10" |. Parser.end
+        , Parser.succeed (15, Just "m") |. Parser.symbol "15" |. Parser.end
+        , Parser.succeed (20, Just "m") |. Parser.symbol "20" |. Parser.end
+        , Parser.succeed (25, Just "m") |. Parser.symbol "25" |. Parser.end
+        , Parser.succeed (30, Just "m") |. Parser.symbol "30" |. Parser.end
+        , Parser.succeed (35, Just "m") |. Parser.symbol "35" |. Parser.end
+        , Parser.succeed (40, Just "m") |. Parser.symbol "40" |. Parser.end
+        , Parser.succeed (45, Just "m") |. Parser.symbol "45" |. Parser.end
+        , Parser.succeed (50, Just "m") |. Parser.symbol "50" |. Parser.end
+        , Parser.succeed (55, Just "m") |. Parser.symbol "55" |. Parser.end
+        ]
+    ]
+
+shortDurationParser : Parser (Token, Maybe String)
+shortDurationParser =
+  Parser.succeed identity
+  |. Parser.symbol "~"
+  |= intParser (Just 1, Just 120)
+  |> Parser.andThen (\initial ->
+    Parser.oneOf
+      [ x_hmParser initial
+      , x_fraction_hParser initial
+      , x_dot_y_hParser initial
+      ]
+  )
+  |> Parser.map (\(t, c) -> (Duration t, c))
+
+isDuration : List String -> Maybe (Token, Maybe String, Int)
+isDuration list =
+  List.head list
+  |> Maybe.andThen
+    (\s ->
+      Parser.run shortDurationParser s
+      |> Result.map (\(token, completion) -> Just (token, completion, 1))
+      |> Result.withDefault Nothing
+    )
+
 isToday : List String -> Maybe (Token, Maybe String, Int)
 isToday list =
   case List.head list of
@@ -200,6 +362,26 @@ findFirst list data =
         x ->
           x
 
+smallDurationToMinutes : SmallDuration -> Int
+smallDurationToMinutes d =
+  case d of
+    Minutes m -> m
+    Hours h m -> h * 60 + m
+
+findMaxDuration : List (Token, Maybe String, Offset) -> Maybe SmallDuration
+findMaxDuration list =
+  List.foldl (\item state ->
+    case item of
+      (Duration d, _, _) ->
+        case state of
+          Nothing ->
+            Just d
+          Just d_ ->
+            Just (if smallDurationToMinutes d_ > smallDurationToMinutes d then d_ else d)
+      _ ->
+        state
+  ) Nothing list
+
 parse : List Offset -> String -> List (Token, Maybe String, Offset) -> List (Token, Maybe String, Offset)
 parse offsets s acc =
   let
@@ -210,7 +392,12 @@ parse offsets s acc =
       [] ->
         List.reverse acc
       h::tail ->
-        findFirst [ isToday, isTomorrow ] strings
+        findFirst
+          [ isToday
+          , isTomorrow
+          , isDuration
+          ]
+          strings
         |> Maybe.map (\(token, completion, n) ->
           let
             combinedOffset =
@@ -236,56 +423,6 @@ parse offsets s acc =
               [] ->
                 parse tail s ((Description, Nothing, h) :: acc)
           )
-
--- type alias ParserState =
---   { offsetCount : Int
---   , currentParse : List Token
---   }
-
--- startingParserState : ParserState
--- startingParserState =
---   { offsetCount = 0
---   , currentParse = []
---   }
-
--- -- parseIntoTokens : (Int, List String) -> ParserState -> List Token
--- -- parseIntoTokens (caret, list) state =
--- --   {- the cursor might be anywhere in the list, including right at the start or
--- --      right at the end.  In the parser state, I track the `offsetCount`, which is
--- --      the number of characters that I've encountered thus far.
-
--- --      If the offsetCount is
--- --   -}
--- --   case list of
--- --     [] ->
--- --       state.currentParse
--- --     ""::restOfList ->
--- --       {- The only way I'll see an empty string is if I have two consecutive spaces.
--- --          So if I have a whitespace as my most recent parse, extend it; otherwise,
--- --          put in a whitespace token with 2 consecutive spaces.
--- --       -}
--- --       case state.currentParse of
--- --         Whitespace n::restOfParse ->
--- --           parseIntoTokens caret restOfList
--- --             { state
--- --             | currentParse = Whitespace (n + 1)::restOfParse
--- --             , offsetCount = state.offsetCount + 1
--- --             }
--- --         other ->
--- --           parseIntoTokens caret restOfList
--- --             { state
--- --             | currentParse = Whitespace 2::other
--- --             , offsetCount = state.offsetCount + 2
--- --             }
--- --     _ ->
--- --       {- Chances are that this is a normal word (or phrase), but it may be keyword(s)
--- --          with some special meaning.  So, let's see what we can find, longest
--- --          chain-of-meaning being prioritised over a smaller one, and taking the
--- --          current parse into account.
--- --       -}
--- --       if 
--- --     [] ->
--- --       state.currentParse
 
 tokenise : String -> Int -> Maybe Offset -> List Offset -> List Offset
 tokenise s i current acc =
@@ -377,6 +514,7 @@ update msg model =
                     , month = toMonth model.zone model.nowish
                     , day = Time.toDay model.zone model.nowish
                     }
+                  , duration = findMaxDuration x.parse
                   } :: model.data
               }
             , Cmd.none
@@ -404,6 +542,7 @@ classFor token =
   case token of
     Today -> "when"
     Tomorrow -> "when"
+    Duration _ -> "duration"
     Description -> ""
 
 tokenWithoutCompletion : String -> Token -> String -> Html Msg
@@ -457,7 +596,7 @@ viewTodoList model =
   ol
     []    
     ( List.map
-      (\{ s, created } ->
+      (\{ s, created, duration } ->
         li
           [ class "todo" ]
           [ span
@@ -466,6 +605,32 @@ viewTodoList model =
           , span
               [ class "todo-created" ]
               [ text <| "Created " ++ String.fromInt created.year ++ "-" ++ String.fromInt created.month ++ "-" ++ String.fromInt created.day ]
+          , case duration of
+              Nothing ->
+                text ""
+              Just duration_ ->
+                span
+                  [ class "duration" ]
+                  [ case duration_ of
+                      Minutes m ->
+                        if m == 1 then
+                          text "1 minute"
+                        else if m < 60 then
+                          text <| String.fromInt m ++ " minutes"
+                        else
+                          let
+                            h = modBy 60 m
+                            min = m - h * 60
+                          in
+                            if min == 0 then
+                              text <| String.fromInt h ++ "h"
+                            else
+                              text <| String.fromInt h ++ "h" ++ String.fromInt min ++ "m"
+                      Hours h 0 ->
+                        text <| String.fromInt h ++ "h"
+                      Hours h m ->
+                        text <| String.fromInt h ++ "h" ++ String.fromInt m ++ "m"
+                  ]
           ]
       )
       model.data

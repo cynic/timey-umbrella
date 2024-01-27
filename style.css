@@ -51,10 +51,18 @@ body {
   background-color: khaki;
 }
 
+.duration {
+  background-color: hsl(39, 100%, 65%);
+}
+
+li.todo span {
+  margin-left: 1ex;
+  padding: 3px;
+  border-radius: 4px;
+}
+
 .todo-created {
   background-color: lightgreen;
-  margin-left: 1ex;
-  padding: 2px;
 }
 
 .todo-text {
