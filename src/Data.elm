@@ -73,7 +73,6 @@ type alias Offset =
 type alias AwesomeBarState =
   { s : String
   , i : Int -- caret position
-  , tokenised : List Offset
   , parse : List (Token, Maybe String, Offset)
   }
 -- AwesomeBar end

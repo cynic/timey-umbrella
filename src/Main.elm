@@ -194,15 +194,11 @@ updateSetString : String -> Int -> AwesomeBarState -> Model -> (Model, Cmd Msg)
 updateSetString s i x model =
   ( { model
     | mode =
-      let
-        tokens = tokenise s 0 Nothing []
-      in
         AwesomeBar
           { x
           | s = s
           , i = i
-          , tokenised = tokens
-          , parse = parse tokens s []
+          , parse = parse (tokenise s 0 Nothing []) s []
           }
     }
   , Ports.shiftCaret ({-Debug.log "Requesting caret shift to"-} i)
@@ -397,7 +393,7 @@ subscriptions model =
           ( D.field "key" D.string
           |> D.map
             (\key ->
-              if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [], tokenised = [] })
+              if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [] })
               else NoOp
             )
           )
