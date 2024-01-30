@@ -7,8 +7,9 @@ import Browser.Navigation as Navigation
 
 type alias Date =
   { year : Int
-  , month : Int
+  , month : Time.Month
   , day : Int
+  , weekday : Time.Weekday
   }
 
 -- type alias RoughInterval =

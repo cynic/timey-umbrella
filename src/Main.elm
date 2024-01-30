@@ -21,22 +21,6 @@ import Task
 import Time.Extra as Time
 import Parser
 
-toMonth : Time.Zone -> Time.Posix -> Int
-toMonth zone time =
-  case Time.toMonth zone time of
-    Time.Jan -> 1
-    Time.Feb -> 2
-    Time.Mar -> 3
-    Time.Apr -> 4
-    Time.May -> 5
-    Time.Jun -> 6
-    Time.Jul -> 7
-    Time.Aug -> 8
-    Time.Sep -> 9
-    Time.Oct -> 10
-    Time.Nov -> 11
-    Time.Dec -> 12
-
 init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
 init _ _ key =
   ( { key = key
@@ -253,11 +237,7 @@ update msg model =
               | mode = Waiting
               , data =
                   { s = x.s
-                  , created =
-                    { year = Time.toYear model.zone model.nowish
-                    , month = toMonth model.zone model.nowish
-                    , day = Time.toDay model.zone model.nowish
-                    }
+                  , created = posixToDate model.zone model.nowish
                   , duration = findMaxDuration x.parse
                   } :: model.data
               }
@@ -296,6 +276,7 @@ view model =
           []
           [ viewAwesomeBar model state
           , viewTodoList model
+          , viewCalendar (\d -> d.weekday == Time.Tue || d.weekday == Time.Mon || d.weekday == Time.Sat) (posixToDate model.zone model.nowish) 16
           ]
     ]
   }

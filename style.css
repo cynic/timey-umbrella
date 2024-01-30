@@ -69,3 +69,57 @@ li.todo span {
   text-decoration: underline;
   font-style: italic;
 }
+
+.calendar {
+  border: solid 1px darkgrey;
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.calendar .calendar-week {
+  border-bottom: solid 1px black;
+}
+
+.calendar .calendar-day {
+  padding: 2px;
+  width: 2.5ex;
+  height: 2.5ex;
+  text-align: center;
+  border-radius: 35%;
+}
+
+.calendar .calendar-day.past {
+  color: lightgray;
+}
+
+.calendar .calendar-day.month-start {
+  font-weight: bold;
+  content: url(noun-month.png);
+}
+
+.calendar .calendar-day.today {
+  background-color: lightblue;
+}
+
+.calendar .calendar-day.weekend.past {
+  color: lightgreen;
+}
+.calendar .calendar-day.weekend {
+  color: darkgreen;
+}
+
+.calendar .calendar-day.highlight {
+  background-color: yellow;
+}
+
+.calendar .calendar-day.highlight.weekend {
+  background-color: lightgreen;
+}
+
+.calendar .calendar-day.highlight.today {
+  background-color: orange;
+}
+
+.calendar .calendar-day.highlight.past {
+  background-color: transparent;
+}
