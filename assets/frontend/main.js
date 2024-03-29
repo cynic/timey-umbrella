@@ -1,3 +1,8 @@
+import { Elm } from './src/Main.elm';
+
+const $root = document.createElement('div');
+document.body.appendChild($root);
+
 /* For positions within a `contenteditable`, I've used/adapted the following code/resources:
 
 - https://stackoverflow.com/a/41034697
@@ -117,7 +122,7 @@ caretTracker = { start: 0, end: 0 }; // this is SEPARATE from caretPosition.
 // updated as well to the manually-set value.
 
 let app = Elm.Main.init({
-  node: document.getElementById('myapp'),
+  node: $root,
   flags: null
 });
 

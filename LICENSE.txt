@@ -151,7 +151,7 @@ ownership of such entity.
 15) Exceptions to Use. You may not use the Original Work in any way if you are
 a citizen of one of the following countries or territories:
  a. United States of America
- b. United Kingdom (except for Scotland and Wales)
+ b. United Kingdom (except for Scotland, Wales, and Northern Ireland)
  c. Germany
  d. France
  e. Israel (except for Palestinian citizens of Israel)
