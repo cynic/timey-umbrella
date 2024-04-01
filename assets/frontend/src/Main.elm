@@ -6,7 +6,6 @@ import View exposing (..)
 
 import Browser
 import Html exposing (Html, div, text, span, li, ol)
-import Browser.Navigation as Navigation
 import Url exposing (Url)
 import Time
 import Browser.Events
@@ -21,10 +20,9 @@ import Task
 import Time.Extra as Time
 import Parser
 
-init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
-init _ _ key =
-  ( { key = key
-  , mode = Waiting
+init : () -> (Model, Cmd Msg)
+init _ =
+  ( { mode = Waiting
   , nowish = Time.millisToPosix 0
   , zone = Time.utc -- for now, 'cos I'm lazy
   , data = []
@@ -262,24 +260,21 @@ update msg model =
 
 -- VIEW
 
-view : Model -> Browser.Document Msg
+view : Model -> Html Msg
 view model =
-  { title = "Hello, Elm!"
-  , body =
-    [ div []
-      [ text "Hello, Elm!" ]
-    , case model.mode of
-      Waiting ->
-        viewTodoList model
-      AwesomeBar state ->
-        div
-          []
-          [ viewAwesomeBar model state
-          , viewTodoList model
-          , viewCalendar (\d -> d.weekday == Time.Tue || d.weekday == Time.Mon || d.weekday == Time.Sat) (posixToDate model.zone model.nowish) 16
-          ]
+  div
+    []
+    [ case model.mode of
+        Waiting ->
+          viewTodoList model
+        AwesomeBar state ->
+          div
+            []
+            [ viewAwesomeBar model state
+            , viewTodoList model
+            , viewCalendar (\d -> d.weekday == Time.Tue || d.weekday == Time.Mon || d.weekday == Time.Sat) (posixToDate model.zone model.nowish) 16
+            ]
     ]
-  }
 
 
 -- SUBSCRIPTIONS
@@ -406,11 +401,11 @@ subscriptions model =
 
 main : Program () Model Msg
 main =
-  Browser.application
+  Browser.element
   { init = init
   , update = update
   , view = view
   , subscriptions = subscriptions
-  , onUrlRequest = \_ -> NoOp
-  , onUrlChange = \_ -> NoOp
+  -- , onUrlRequest = \_ -> NoOp
+  -- , onUrlChange = \_ -> NoOp
   }

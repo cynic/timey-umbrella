@@ -109,8 +109,7 @@ type alias Todo =
   }
 
 type alias Model =
-  { key : Navigation.Key
-  , mode : Mode
+  { mode : Mode
   , nowish : Time.Posix
   , zone : Time.Zone
   , data : List Todo

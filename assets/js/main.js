@@ -3274,7 +3274,6 @@
           }
           return _Utils_Tuple3(newOffset, row, col);
         });
-        var $author$project$Data$NoOp = { $: "NoOp" };
         var $elm$core$Basics$EQ = { $: "EQ" };
         var $elm$core$Basics$GT = { $: "GT" };
         var $elm$core$Basics$LT = { $: "LT" };
@@ -9710,7 +9709,7 @@
               continue never;
             }
         };
-        var $elm$browser$Browser$application = _Browser_application;
+        var $elm$browser$Browser$element = _Browser_element;
         var $author$project$Data$GetZone = function(a) {
           return { $: "GetZone", a };
         };
@@ -9737,27 +9736,24 @@
         var $elm$time$Time$millisToPosix = $elm$time$Time$Posix;
         var $elm$time$Time$now = _Time_now($elm$time$Time$millisToPosix);
         var $elm$time$Time$utc = A2($elm$time$Time$Zone, 0, _List_Nil);
-        var $author$project$Main$init = F3(
-          function(_v0, _v1, key) {
-            return _Utils_Tuple2(
-              {
-                data: _List_Nil,
-                key,
-                mode: $author$project$Data$Waiting,
-                nowish: $elm$time$Time$millisToPosix(0),
-                zone: $elm$time$Time$utc
-              },
-              $elm$core$Platform$Cmd$batch(
-                _List_fromArray(
-                  [
-                    A2($elm$core$Task$perform, $author$project$Data$GetZone, $elm$time$Time$here),
-                    A2($elm$core$Task$perform, $author$project$Data$Tick, $elm$time$Time$now)
-                  ]
-                )
+        var $author$project$Main$init = function(_v0) {
+          return _Utils_Tuple2(
+            {
+              data: _List_Nil,
+              mode: $author$project$Data$Waiting,
+              nowish: $elm$time$Time$millisToPosix(0),
+              zone: $elm$time$Time$utc
+            },
+            $elm$core$Platform$Cmd$batch(
+              _List_fromArray(
+                [
+                  A2($elm$core$Task$perform, $author$project$Data$GetZone, $elm$time$Time$here),
+                  A2($elm$core$Task$perform, $author$project$Data$Tick, $elm$time$Time$now)
+                ]
               )
-            );
-          }
-        );
+            )
+          );
+        };
         var $author$project$Data$AB = function(a) {
           return { $: "AB", a };
         };
@@ -9768,6 +9764,7 @@
           return { $: "CaretMoved", a };
         };
         var $author$project$Data$ListenerRemoved = { $: "ListenerRemoved" };
+        var $author$project$Data$NoOp = { $: "NoOp" };
         var $author$project$Data$SwitchMode = function(a) {
           return { $: "SwitchMode", a };
         };
@@ -13134,18 +13131,11 @@
           );
         };
         var $author$project$Main$view = function(model) {
-          return {
-            body: _List_fromArray(
+          return A2(
+            $elm$html$Html$div,
+            _List_Nil,
+            _List_fromArray(
               [
-                A2(
-                  $elm$html$Html$div,
-                  _List_Nil,
-                  _List_fromArray(
-                    [
-                      $elm$html$Html$text("Hello, Elm!")
-                    ]
-                  )
-                ),
                 function() {
                   var _v0 = model.mode;
                   if (_v0.$ === "Waiting") {
@@ -13173,23 +13163,11 @@
                   }
                 }()
               ]
-            ),
-            title: "Hello, Elm!"
-          };
+            )
+          );
         };
-        var $author$project$Main$main = $elm$browser$Browser$application(
-          {
-            init: $author$project$Main$init,
-            onUrlChange: function(_v0) {
-              return $author$project$Data$NoOp;
-            },
-            onUrlRequest: function(_v1) {
-              return $author$project$Data$NoOp;
-            },
-            subscriptions: $author$project$Main$subscriptions,
-            update: $author$project$Main$update,
-            view: $author$project$Main$view
-          }
+        var $author$project$Main$main = $elm$browser$Browser$element(
+          { init: $author$project$Main$init, subscriptions: $author$project$Main$subscriptions, update: $author$project$Main$update, view: $author$project$Main$view }
         );
         _Platform_export({ "Main": { "init": $author$project$Main$main(
           $elm$json$Json$Decode$succeed(_Utils_Tuple0)
