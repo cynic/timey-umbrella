@@ -1,5 +1,7 @@
 // import the compiled Elm app, with accompanying essential JavaScript:
-import './main.js';
+if (!!document.getElementById("elm-app")) {
+  import('./main.js')
+}
 // import the other JS files:
 // import './debug.js';
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`

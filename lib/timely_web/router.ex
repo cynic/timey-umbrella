@@ -21,6 +21,7 @@ defmodule TimelyWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/favicon.ico", PageController, :favicon
   end
 
   # Other scopes may use custom stacks.
