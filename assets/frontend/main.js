@@ -1,7 +1,6 @@
 import { Elm } from './src/Main.elm';
 
-const $root = document.createElement('div');
-document.body.appendChild($root);
+const $root = document.getElementById("elm-app");
 
 /* For positions within a `contenteditable`, I've used/adapted the following code/resources:
 

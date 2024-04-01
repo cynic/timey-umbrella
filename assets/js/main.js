@@ -13178,8 +13178,7 @@
 
   // main.js
   var import_Main = __toESM(require_Main());
-  var $root = document.createElement("div");
-  document.body.appendChild($root);
+  var $root = document.getElementById("elm-app");
   caretPosition = 0;
   isComposing = false;
   lastInputEvent = null;
