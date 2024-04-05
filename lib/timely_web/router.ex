@@ -20,7 +20,6 @@ defmodule TimelyWeb.Router do
   scope "/", TimelyWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
     get "/favicon.ico", PageController, :favicon
   end
 
@@ -64,6 +63,8 @@ defmodule TimelyWeb.Router do
 
   scope "/", TimelyWeb do
     pipe_through [:browser, :require_authenticated_user]
+
+    get "/", PageController, :home
 
     live_session :require_authenticated_user,
       on_mount: [{TimelyWeb.UserAuth, :ensure_authenticated}] do
