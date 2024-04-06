@@ -101,7 +101,7 @@ tokenWithCompletion s token completion txt =
         ]
         [ text completion ]
     ]
-  
+
 isWithinOffset : Int -> Int -> Int -> Bool
 isWithinOffset offset extent caretPosition =
   offset <= caretPosition && offset + extent >= caretPosition
@@ -126,12 +126,12 @@ viewTodoList model =
     ( List.map
       (\{ s, created, duration } ->
         li
-          [ class "todo" ]
+          [ class "checklist-item" ]
           [ span
-              [ class "todo-text" ]
+              [ class "description" ]
               [ text s ]
           , span
-              [ class "todo-created" ]
+              [ class "created" ]
               [ text <| "Created " ++ String.fromInt created.year ++ "-" ++ monthToString created.month ++ "-" ++ String.fromInt created.day ]
           , case duration of
               Nothing ->
@@ -181,20 +181,6 @@ addWeeks weeks date =
   partsToPosix Time.utc (Parts date.year date.month date.day 0 0 0 0)
   |> (\posix -> millisToPosix (posixToMillis posix + (weeks * 7 * 86400000) + 100000)) -- a bit more than 1 week, but that's fine.
   |> posixToDate Time.utc
-
-type DateSearchDirection
-  = SearchForward
-  | SearchBackward
-
-type DateSearchStart
-  = StartIncluding Date
-  | StartExcluding Date
-
-type alias DateSearch =
-  { start : DateSearchStart
-  , direction : DateSearchDirection
-  , predicate : Date -> Bool
-  }
 
 seekDate : DateSearch -> Date
 seekDate search =

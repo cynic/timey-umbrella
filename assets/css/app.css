@@ -59,6 +59,9 @@ body {
 .duration {
   background-color: hsl(39, 100%, 65%);
 }
+.duration::before {
+  content: "⏳";
+}
 
 li.todo span {
   margin-left: 1ex;

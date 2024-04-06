@@ -1,6 +1,7 @@
 elm-stuff
 node_modules
 .elixir_ls
+/assets/js/main.js
 
 # The directory Mix will write compiled artifacts to.
 /_build/

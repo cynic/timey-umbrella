@@ -1,7 +1,6 @@
 module Data exposing (..)
 
 import Time
-import Browser.Navigation as Navigation
 
 -- MODEL
 
@@ -113,4 +112,18 @@ type alias Model =
   , nowish : Time.Posix
   , zone : Time.Zone
   , data : List Todo
+  }
+
+type DateSearchDirection
+  = SearchForward
+  | SearchBackward
+
+type DateSearchStart
+  = StartIncluding Date
+  | StartExcluding Date
+
+type alias DateSearch =
+  { start : DateSearchStart
+  , direction : DateSearchDirection
+  , predicate : Date -> Bool
   }
