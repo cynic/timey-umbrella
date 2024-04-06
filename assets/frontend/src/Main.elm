@@ -272,7 +272,7 @@ view model =
             []
             [ viewAwesomeBar model state
             , viewTodoList model
-            , viewCalendar (\d -> d.weekday == Time.Tue || d.weekday == Time.Mon || d.weekday == Time.Sat) (posixToDate model.zone model.nowish) 16
+            , viewCalendar (\d -> False) (posixToDate model.zone model.nowish) 25
             ]
     ]
 

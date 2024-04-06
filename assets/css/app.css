@@ -86,11 +86,11 @@ li.todo span {
 }
 
 .calendar .calendar-day {
-  padding: 2px;
-  width: 2.5ex;
-  height: 2.5ex;
+  padding: 3px;
+  width: 3.8ex;
+  height: 2.6ex;
   text-align: center;
-  border-radius: 35%;
+  border-radius: 50%;
 }
 
 .calendar .calendar-day.past {
@@ -99,7 +99,11 @@ li.todo span {
 
 .calendar .calendar-day.month-start {
   font-weight: bold;
-  content: url(/images/noun-month.png);
+  transform: rotate(45deg);
+}
+
+.calendar .calendar-day.public-holiday {
+  background-color: pink;
 }
 
 .calendar .calendar-day.today {

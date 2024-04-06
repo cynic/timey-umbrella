@@ -7,6 +7,7 @@ import Html.Keyed as Keyed
 import Time.Extra exposing (..)
 import Time exposing (..)
 import List.Extra
+import Easter exposing (easter, EasterMethod(..))
 
 posixToDate : Time.Zone -> Time.Posix -> Date
 posixToDate zone nowish =
@@ -181,12 +182,45 @@ addWeeks weeks date =
   |> (\posix -> millisToPosix (posixToMillis posix + (weeks * 7 * 86400000) + 100000)) -- a bit more than 1 week, but that's fine.
   |> posixToDate Time.utc
 
+type DateSearchDirection
+  = SearchForward
+  | SearchBackward
+
+type DateSearchStart
+  = StartIncluding Date
+  | StartExcluding Date
+
+type alias DateSearch =
+  { start : DateSearchStart
+  , direction : DateSearchDirection
+  , predicate : Date -> Bool
+  }
+
+seekDate : DateSearch -> Date
+seekDate search =
+  let
+    next =
+      case search.direction of
+        SearchForward ->
+          incrementDay
+        SearchBackward ->
+          decrementDay
+    doSeek dt =
+      if search.predicate dt then
+        dt
+      else
+        doSeek (next dt)
+  in
+    case search.start of
+      StartIncluding dt ->
+        doSeek dt
+      StartExcluding dt ->
+        doSeek (next dt)
+
 getSaturday : Date -> Date
 getSaturday date =
-  if date.weekday == Sat then
-    date
-  else
-    getSaturday (decrementDay date)
+  seekDate
+    (DateSearch (StartIncluding date) SearchBackward (\d -> d.weekday == Sat))
 
 isWeekend : Date -> Bool
 isWeekend date =
@@ -208,12 +242,64 @@ cmpDate date1 date2 =
   in
     compare posix1 posix2
 
+weekDay : Int -> Month -> Int -> Time.Weekday
+weekDay year month day =
+  Time.Extra.partsToPosix Time.utc (Time.Extra.Parts year month day 0 0 0 0)
+  |> Time.toWeekday Time.utc
+
+ymdToDate : Int -> Month -> Int -> Date
+ymdToDate year month day =
+  Date year month day (weekDay year month day)
+
+publicHolidays : Int -> List (Date, String) -- in South Africa
+publicHolidays year =
+  let
+    easterDate =
+      easter Western year
+      |> (\dt -> ymdToDate dt.year dt.month dt.day)
+    extraHolidays =
+      case year of
+        2024 ->
+          [ (ymdToDate year May 29, "General Election Day")
+          ]
+        _ ->
+          []
+  in
+    extraHolidays ++
+    [ (ymdToDate year Jan 1, "New Year's Day")
+    , (ymdToDate year Mar 21, "Human Rights Day")
+    , (seekDate (DateSearch (StartExcluding easterDate) SearchBackward (\d -> d.weekday == Fri))
+      , "Good Friday"
+      )
+    , (seekDate (DateSearch (StartExcluding easterDate) SearchForward (\d -> d.weekday == Mon))
+      , "Family Day"
+      )
+    , (ymdToDate year Apr 27, "Freedom Day")
+    , (ymdToDate year May 1, "Workers' Day")
+    , (ymdToDate year Jun 16, "Youth Day")
+    , (ymdToDate year Aug 9, "National Women's Day")
+    , (ymdToDate year Sep 24, "Heritage Day")
+    , (ymdToDate year Dec 16, "Day of Reconciliation")
+    , (ymdToDate year Dec 25, "Christmas Day")
+    , (ymdToDate year Dec 26, "Day of Goodwill")
+    ]
+    |> List.map (\(dt, name) ->
+      ( seekDate (DateSearch (StartIncluding dt) SearchForward (\d -> d.weekday /= Sun))
+      , name
+      )
+    )
+
 viewCalendar : (Date -> Bool) -> Date -> Int -> Html Msg
 viewCalendar highlight today numWeeks =
   -- find the closest Saturday.  This is when my week starts 😂… 'cos, yeah, I said so!
   let
     saturday =
       getSaturday today
+    holidays = publicHolidays today.year
+    getPublicHoliday date =
+      holidays
+      |> List.Extra.find (\(dt, _) -> cmpDate dt date == EQ)
+      |> Maybe.map (\(_, name) -> name)
   in
     Html.table
       [ class "calendar" ]
@@ -234,6 +320,7 @@ viewCalendar highlight today numWeeks =
               |> List.map (\day ->
                 let
                   cmp = cmpDate day today
+                  holiday = getPublicHoliday day
                 in
                   Html.td
                     [ class "calendar-day"
@@ -244,11 +331,13 @@ viewCalendar highlight today numWeeks =
                         , ("month-start", day.day == 1)
                         , ("weekend", day.weekday == Sat || day.weekday == Sun)
                         , ("highlight", highlight day)
+                        , ("public-holiday", holiday /= Nothing)
                         ]
-                    , if day.day == 1 then
-                        title <| monthToString day.month
-                      else
-                        class "" -- ignored.
+                    , case holiday of
+                        Just name ->
+                          title (String.fromInt day.day ++ " " ++ monthToString day.month ++ ", " ++ name)
+                        Nothing ->
+                          title (String.fromInt day.day ++ " " ++ monthToString day.month)
                     ]
                     [ text <| String.fromInt day.day ]
               )

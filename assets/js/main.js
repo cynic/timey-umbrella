@@ -12798,6 +12798,36 @@
             return A2($elm$core$Basics$compare, posix1, posix2);
           }
         );
+        var $elm_community$list_extra$List$Extra$find = F2(
+          function(predicate, list) {
+            find:
+              while (true) {
+                if (!list.b) {
+                  return $elm$core$Maybe$Nothing;
+                } else {
+                  var first = list.a;
+                  var rest = list.b;
+                  if (predicate(first)) {
+                    return $elm$core$Maybe$Just(first);
+                  } else {
+                    var $temp$predicate = predicate, $temp$list = rest;
+                    predicate = $temp$predicate;
+                    list = $temp$list;
+                    continue find;
+                  }
+                }
+              }
+          }
+        );
+        var $author$project$View$DateSearch = F3(
+          function(start2, direction, predicate) {
+            return { direction, predicate, start: start2 };
+          }
+        );
+        var $author$project$View$SearchBackward = { $: "SearchBackward" };
+        var $author$project$View$StartIncluding = function(a) {
+          return { $: "StartIncluding", a };
+        };
         var $author$project$View$decrementDay = function(date) {
           return A2(
             $author$project$View$posixToDate,
@@ -12815,18 +12845,6 @@
             )
           );
         };
-        var $author$project$View$getSaturday = function(date) {
-          getSaturday:
-            while (true) {
-              if (_Utils_eq(date.weekday, $elm$time$Time$Sat)) {
-                return date;
-              } else {
-                var $temp$date = $author$project$View$decrementDay(date);
-                date = $temp$date;
-                continue getSaturday;
-              }
-            }
-        };
         var $author$project$View$incrementDay = function(date) {
           return A2(
             $author$project$View$posixToDate,
@@ -12841,6 +12859,50 @@
                 $elm$time$Time$utc,
                 A7($justinmimbs$time_extra$Time$Extra$Parts, date.year, date.month, date.day, 0, 0, 0, 0)
               )
+            )
+          );
+        };
+        var $author$project$View$seekDate = function(search) {
+          var next = function() {
+            var _v1 = search.direction;
+            if (_v1.$ === "SearchForward") {
+              return $author$project$View$incrementDay;
+            } else {
+              return $author$project$View$decrementDay;
+            }
+          }();
+          var doSeek = function(dt2) {
+            doSeek:
+              while (true) {
+                if (search.predicate(dt2)) {
+                  return dt2;
+                } else {
+                  var $temp$dt = next(dt2);
+                  dt2 = $temp$dt;
+                  continue doSeek;
+                }
+              }
+          };
+          var _v0 = search.start;
+          if (_v0.$ === "StartIncluding") {
+            var dt = _v0.a;
+            return doSeek(dt);
+          } else {
+            var dt = _v0.a;
+            return doSeek(
+              next(dt)
+            );
+          }
+        };
+        var $author$project$View$getSaturday = function(date) {
+          return $author$project$View$seekDate(
+            A3(
+              $author$project$View$DateSearch,
+              $author$project$View$StartIncluding(date),
+              $author$project$View$SearchBackward,
+              function(d) {
+                return _Utils_eq(d.weekday, $elm$time$Time$Sat);
+              }
             )
           );
         };
@@ -12871,6 +12933,216 @@
             default:
               return "December";
           }
+        };
+        var $author$project$View$SearchForward = { $: "SearchForward" };
+        var $author$project$View$StartExcluding = function(a) {
+          return { $: "StartExcluding", a };
+        };
+        var $akheron$elm_easter$Easter$Western = { $: "Western" };
+        var $akheron$elm_easter$Easter$Date = F3(
+          function(year, month, day) {
+            return { day, month, year };
+          }
+        );
+        var $akheron$elm_easter$Easter$monthFromMonthNumber = function(m) {
+          switch (m) {
+            case 1:
+              return $elm$time$Time$Jan;
+            case 2:
+              return $elm$time$Time$Feb;
+            case 3:
+              return $elm$time$Time$Mar;
+            case 4:
+              return $elm$time$Time$Apr;
+            case 5:
+              return $elm$time$Time$May;
+            case 6:
+              return $elm$time$Time$Jun;
+            case 7:
+              return $elm$time$Time$Jul;
+            case 8:
+              return $elm$time$Time$Aug;
+            case 9:
+              return $elm$time$Time$Sep;
+            case 10:
+              return $elm$time$Time$Oct;
+            case 11:
+              return $elm$time$Time$Nov;
+            default:
+              return $elm$time$Time$Dec;
+          }
+        };
+        var $akheron$elm_easter$Easter$easter = F2(
+          function(method, year) {
+            var y = year;
+            var g = A2($elm$core$Basics$modBy, 19, y);
+            var pj = function(yy) {
+              var i = A2($elm$core$Basics$modBy, 30, 19 * g + 15);
+              var j = A2($elm$core$Basics$modBy, 7, yy + (yy / 4 | 0) + i);
+              return i - j;
+            };
+            var p = function() {
+              switch (method.$) {
+                case "Julian":
+                  return pj(y);
+                case "Orthodox":
+                  var e = y <= 1600 ? 0 : (y / 100 | 0) - 16 - (((y / 100 | 0) - 16) / 4 | 0);
+                  return pj(y) + 10 + e;
+                default:
+                  var c = y / 100 | 0;
+                  var h = A2($elm$core$Basics$modBy, 30, c - (c / 4 | 0) - ((8 * c + 13) / 25 | 0) + 19 * g + 15);
+                  var i = h - (h / 28 | 0) * (1 - (h / 28 | 0) * (29 / (h + 1) | 0) * ((21 - g) / 11 | 0));
+                  var j = A2($elm$core$Basics$modBy, 7, y + (y / 4 | 0) + i + 2 - c + (c / 4 | 0));
+                  return i - j;
+              }
+            }();
+            var m = 3 + ((p + 26) / 30 | 0);
+            var d = 1 + A2($elm$core$Basics$modBy, 31, p + 27 + ((p + 6) / 40 | 0));
+            return A3(
+              $akheron$elm_easter$Easter$Date,
+              y,
+              $akheron$elm_easter$Easter$monthFromMonthNumber(m),
+              d
+            );
+          }
+        );
+        var $author$project$View$weekDay = F3(
+          function(year, month, day) {
+            return A2(
+              $elm$time$Time$toWeekday,
+              $elm$time$Time$utc,
+              A2(
+                $justinmimbs$time_extra$Time$Extra$partsToPosix,
+                $elm$time$Time$utc,
+                A7($justinmimbs$time_extra$Time$Extra$Parts, year, month, day, 0, 0, 0, 0)
+              )
+            );
+          }
+        );
+        var $author$project$View$ymdToDate = F3(
+          function(year, month, day) {
+            return A4(
+              $author$project$Data$Date,
+              year,
+              month,
+              day,
+              A3($author$project$View$weekDay, year, month, day)
+            );
+          }
+        );
+        var $author$project$View$publicHolidays = function(year) {
+          var extraHolidays = function() {
+            if (year === 2024) {
+              return _List_fromArray(
+                [
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$May, 29),
+                    "General Election Day"
+                  )
+                ]
+              );
+            } else {
+              return _List_Nil;
+            }
+          }();
+          var easterDate = function(dt) {
+            return A3($author$project$View$ymdToDate, dt.year, dt.month, dt.day);
+          }(
+            A2($akheron$elm_easter$Easter$easter, $akheron$elm_easter$Easter$Western, year)
+          );
+          return A2(
+            $elm$core$List$map,
+            function(_v0) {
+              var dt = _v0.a;
+              var name = _v0.b;
+              return _Utils_Tuple2(
+                $author$project$View$seekDate(
+                  A3(
+                    $author$project$View$DateSearch,
+                    $author$project$View$StartIncluding(dt),
+                    $author$project$View$SearchForward,
+                    function(d) {
+                      return !_Utils_eq(d.weekday, $elm$time$Time$Sun);
+                    }
+                  )
+                ),
+                name
+              );
+            },
+            _Utils_ap(
+              extraHolidays,
+              _List_fromArray(
+                [
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Jan, 1),
+                    "New Year's Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Mar, 21),
+                    "Human Rights Day"
+                  ),
+                  _Utils_Tuple2(
+                    $author$project$View$seekDate(
+                      A3(
+                        $author$project$View$DateSearch,
+                        $author$project$View$StartExcluding(easterDate),
+                        $author$project$View$SearchBackward,
+                        function(d) {
+                          return _Utils_eq(d.weekday, $elm$time$Time$Fri);
+                        }
+                      )
+                    ),
+                    "Good Friday"
+                  ),
+                  _Utils_Tuple2(
+                    $author$project$View$seekDate(
+                      A3(
+                        $author$project$View$DateSearch,
+                        $author$project$View$StartExcluding(easterDate),
+                        $author$project$View$SearchForward,
+                        function(d) {
+                          return _Utils_eq(d.weekday, $elm$time$Time$Mon);
+                        }
+                      )
+                    ),
+                    "Family Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Apr, 27),
+                    "Freedom Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$May, 1),
+                    "Workers' Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Jun, 16),
+                    "Youth Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Aug, 9),
+                    "National Women's Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Sep, 24),
+                    "Heritage Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Dec, 16),
+                    "Day of Reconciliation"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Dec, 25),
+                    "Christmas Day"
+                  ),
+                  _Utils_Tuple2(
+                    A3($author$project$View$ymdToDate, year, $elm$time$Time$Dec, 26),
+                    "Day of Goodwill"
+                  )
+                ]
+              )
+            )
+          );
         };
         var $elm_community$list_extra$List$Extra$scanl = F3(
           function(f, b, xs) {
@@ -12907,6 +13179,27 @@
         var $author$project$View$viewCalendar = F3(
           function(highlight, today, numWeeks) {
             var saturday = $author$project$View$getSaturday(today);
+            var holidays = $author$project$View$publicHolidays(today.year);
+            var getPublicHoliday = function(date) {
+              return A2(
+                $elm$core$Maybe$map,
+                function(_v3) {
+                  var name = _v3.b;
+                  return name;
+                },
+                A2(
+                  $elm_community$list_extra$List$Extra$find,
+                  function(_v2) {
+                    var dt = _v2.a;
+                    return _Utils_eq(
+                      A2($author$project$View$cmpDate, dt, date),
+                      $elm$core$Basics$EQ
+                    );
+                  },
+                  holidays
+                )
+              );
+            };
             return A2(
               $elm$html$Html$table,
               _List_fromArray(
@@ -12958,6 +13251,7 @@
                       A2(
                         $elm$core$List$map,
                         function(day) {
+                          var holiday = getPublicHoliday(day);
                           var cmp = A2($author$project$View$cmpDate, day, today);
                           return A2(
                             $elm$html$Html$td,
@@ -12983,13 +13277,26 @@
                                       _Utils_Tuple2(
                                         "highlight",
                                         highlight(day)
+                                      ),
+                                      _Utils_Tuple2(
+                                        "public-holiday",
+                                        !_Utils_eq(holiday, $elm$core$Maybe$Nothing)
                                       )
                                     ]
                                   )
                                 ),
-                                day.day === 1 ? $elm$html$Html$Attributes$title(
-                                  $author$project$View$monthToString(day.month)
-                                ) : $elm$html$Html$Attributes$class("")
+                                function() {
+                                  if (holiday.$ === "Just") {
+                                    var name = holiday.a;
+                                    return $elm$html$Html$Attributes$title(
+                                      $elm$core$String$fromInt(day.day) + (" " + ($author$project$View$monthToString(day.month) + (", " + name)))
+                                    );
+                                  } else {
+                                    return $elm$html$Html$Attributes$title(
+                                      $elm$core$String$fromInt(day.day) + (" " + $author$project$View$monthToString(day.month))
+                                    );
+                                  }
+                                }()
                               ]
                             ),
                             _List_fromArray(
@@ -13152,10 +13459,10 @@
                           A3(
                             $author$project$View$viewCalendar,
                             function(d) {
-                              return _Utils_eq(d.weekday, $elm$time$Time$Tue) || (_Utils_eq(d.weekday, $elm$time$Time$Mon) || _Utils_eq(d.weekday, $elm$time$Time$Sat));
+                              return false;
                             },
                             A2($author$project$View$posixToDate, model.zone, model.nowish),
-                            16
+                            25
                           )
                         ]
                       )
