@@ -1,6 +1,7 @@
 module Data exposing (..)
 
 import Time
+import Http
 
 -- MODEL
 
@@ -100,18 +101,33 @@ type Msg
   | AB ABMsg
   | Tick Time.Posix
   | GetZone Time.Zone
+  | GotChecklistItems (Result Http.Error (List ChecklistItem))
+  | GotChecklistItem (Result Http.Error ChecklistItem)
+  | DeleteChecklistItem Int
+  | PerformChecklistDelete Int -- do it on the client-side, once the server has agreed.
 
-type alias Todo =
-  { s : String
+-- type alias Todo =
+--   { s : String
+--   , created : Date
+--   , duration : Maybe SmallDuration
+--   }
+
+type UIStatus -- for ops that must first be verified by the server
+  = NothingPending
+  | DeletionRequested
+
+type alias ChecklistItem =
+  { id : Int
+  , s : String
   , created : Date
-  , duration : Maybe SmallDuration
+  , pending : UIStatus
   }
 
 type alias Model =
   { mode : Mode
   , nowish : Time.Posix
   , zone : Time.Zone
-  , data : List Todo
+  , checklisten : List ChecklistItem
   }
 
 type DateSearchDirection

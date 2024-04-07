@@ -7,6 +7,8 @@
 
 body {
   font-family: 'Roboto', sans-serif;
+  background: hsl(0, 0%, 37%);
+  padding: 0px 5px;
 }
 
 #awesomebar-container {
@@ -63,19 +65,77 @@ body {
   content: "⏳";
 }
 
-li.todo span {
-  margin-left: 1ex;
-  padding: 3px;
-  border-radius: 4px;
+.skeu-pressed {
+  border-radius: 0px;
+  background: #8ff0a4;
+  box-shadow: inset 2px 2px 1px #396042,
+              inset -2px -2px 1px #e5ffff;
+  /* margin: 10px 5px; */
+  padding: 5px 8px;
 }
 
-.todo-created {
-  background-color: lightgreen;
+.skeu-concave {
+  border-radius: 0px;
+  background: linear-gradient(145deg, hsl(133, 53%, 58%), hsl(133, 100%, 80%));
+  box-shadow:  2px 2px 1px #000000,
+               -2px -2px 1px #e5ffff;
+  /* margin: 10px 5px; */
+  padding: 5px 8px;
 }
 
-.todo-text {
-  text-decoration: underline;
-  font-style: italic;
+.skeu-convex {
+  border-radius: 0px;
+  background: linear-gradient(145deg, hsl(133, 100%, 80%), hsl(133, 53%, 58%));
+  box-shadow:  2px 2px 1px #000000,
+               -2px -2px 1px #e5ffff;
+  /* margin: 10px 5px; */
+  padding: 5px 8px;
+}
+
+.capsule-left {
+  border-top-left-radius: 50%;
+  border-bottom-left-radius: 50%;
+  padding-left: 10px;
+}
+
+.capsule-right {
+  border-top-right-radius: 50%;
+  border-bottom-right-radius: 50%;
+  padding-right: 10px;
+}
+
+ol.checklist {
+  list-style-type: none;
+  padding-left: 0;
+  display: flex;
+  /* elements are stacked vertically, gap of 15px between them, all the same width */
+  flex-direction: column;
+  gap: 15px;
+  width: 350px;
+  /* stretch the elements to full width */
+  align-items: stretch;
+}
+
+li.checklist-item {
+  /* flex-container with a gap of 8px between horizontal spaced elements */
+  display: flex;
+  gap: 2px;
+  /* align items on the cross-axis in the center */
+  align-items: center;
+  min-width: 0; /* needed to make text ellipsis work */
+}
+
+li.checklist-item .description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
+}
+
+li.checklist-item .created {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar {

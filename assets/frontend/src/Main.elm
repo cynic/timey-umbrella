@@ -3,8 +3,8 @@ module Main exposing (..)
 import Data exposing (..)
 import Parsers exposing (..)
 import View exposing (..)
-
 import Browser
+import List.Extra
 import Html exposing (Html, div, text, span, li, ol)
 import Url exposing (Url)
 import Time
@@ -14,22 +14,24 @@ import Html.Attributes exposing (contenteditable, id, class, classList)
 import Platform.Cmd as Cmd
 import String.Extra as String
 import Ports
-import Html.Keyed as Keyed
 import Platform.Cmd as Cmd
 import Task
 import Time.Extra as Time
 import Parser
+import ClientServer
+import Utility exposing (posixToDate)
 
 init : () -> (Model, Cmd Msg)
 init _ =
   ( { mode = Waiting
   , nowish = Time.millisToPosix 0
   , zone = Time.utc -- for now, 'cos I'm lazy
-  , data = []
+  , checklisten = []
   }
   , Cmd.batch
     [ Task.perform GetZone Time.here
     , Task.perform Tick Time.now
+    , ClientServer.getChecklistItems
     ]
   )
 
@@ -233,13 +235,8 @@ update msg model =
           Key Enter ->
             ( { model
               | mode = Waiting
-              , data =
-                  { s = x.s
-                  , created = posixToDate model.zone model.nowish
-                  , duration = findMaxDuration x.parse
-                  } :: model.data
               }
-            , Cmd.none
+            , ClientServer.createChecklistItem x.s
             )
           Key ArrowDown ->
             (model, Cmd.none)
@@ -257,6 +254,30 @@ update msg model =
         (model, Cmd.none)
   GetZone zone ->
     ( { model | zone = zone }, Cmd.none )
+  GotChecklistItems result ->
+    case result of
+      Ok items ->
+        ( { model | checklisten = items }, Cmd.none )
+      Err e ->
+        Debug.log "from server via GotChecklistItems, weirdness…" e
+        |> \_ -> ( model, Cmd.none )
+  DeleteChecklistItem id_ ->
+    ( { model | checklisten = List.Extra.updateAt id_ (\x -> { x | pending = DeletionRequested }) model.checklisten }
+    , ClientServer.deleteChecklistItem id_
+    )
+  PerformChecklistDelete id_ ->
+    ( { model | checklisten = List.filter (\{id} -> id /= id_) model.checklisten }
+    , Cmd.none
+    )
+  GotChecklistItem result ->
+    case result of
+      Ok item ->
+        ( { model | checklisten = item :: model.checklisten }
+        , Cmd.none
+        )
+      Err e ->
+        Debug.log "from server via GotChecklistItem, weirdness…" e
+        |> \_ -> ( model, Cmd.none )
 
 -- VIEW
 
@@ -266,12 +287,12 @@ view model =
     []
     [ case model.mode of
         Waiting ->
-          viewTodoList model
+          viewChecklist model
         AwesomeBar state ->
           div
             []
             [ viewAwesomeBar model state
-            , viewTodoList model
+            , viewChecklist model
             , viewCalendar (\d -> False) (posixToDate model.zone model.nowish) 25
             ]
     ]

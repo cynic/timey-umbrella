@@ -15,12 +15,8 @@ defmodule TimelyWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-  end
-
-  scope "/", TimelyWeb do
-    pipe_through :browser
-
-    get "/favicon.ico", PageController, :favicon
+    plug :fetch_session
+    plug :fetch_current_user
   end
 
   # Other scopes may use custom stacks.
@@ -62,6 +58,11 @@ defmodule TimelyWeb.Router do
   end
 
   scope "/", TimelyWeb do
+    pipe_through [:api, :require_authenticated_user]
+    resources "/checklist_items", ChecklistItemController, except: [:new, :edit]
+  end
+
+  scope "/", TimelyWeb do
     pipe_through [:browser, :require_authenticated_user]
 
     get "/", PageController, :home
@@ -76,6 +77,7 @@ defmodule TimelyWeb.Router do
   scope "/", TimelyWeb do
     pipe_through [:browser]
 
+    get "/favicon.ico", PageController, :favicon
     delete "/users/log_out", UserSessionController, :delete
 
     live_session :current_user,
