@@ -93,7 +93,8 @@ viewChecklist : Model -> Html Msg
 viewChecklist model =
   ol
     [ class "checklist" ]    
-    ( List.map
+    ( List.sortBy (\{id} -> id) model.checklisten
+    |> List.map
       (\{ s, created, id } ->
         li
           [ class "checklist-item" ]
@@ -122,7 +123,6 @@ viewChecklist model =
               [ text "🗑" ]
           ]
       )
-      model.checklisten
     )
 
 viewCalendar : (Date -> Bool) -> Date -> Int -> Html Msg
