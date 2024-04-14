@@ -78,6 +78,35 @@ type alias AwesomeBarState =
   }
 -- AwesomeBar end
 
+type LongerDurationUnit
+  = Week
+  | Month
+  | Quarter
+
+type WhenInDuration a
+  = End
+  | Start
+  | On (List a)
+
+type BigDuration
+  = Days Int -- after how many days. 0 = today, 1 = tomorrow, etc.
+  | Weekdays (WhenInDuration Time.Weekday)
+  | Workdays (WhenInDuration Time.Weekday)
+  | Weekends (WhenInDuration Time.Weekday)
+  | Weeks (WhenInDuration Time.Weekday)
+  | Months (WhenInDuration Int) -- days of month.  EXCLUDE 28-31??
+  | Years (WhenInDuration (Time.Month, Int)) -- months, days of month
+
+type Recurrence
+  = LastCompletedDatePlus BigDuration
+  | Every Int BigDuration -- The Int is for the recurrence, e.g. every 2 [unit], every 1 [unit], etc
+  | Once (WhenInDuration (Time.Month, Int)) -- month & day, exactly
+
+type alias When =
+  { anchor : Date
+  , recurrence : Recurrence
+  }
+
 type Mode
   = Waiting
   | AwesomeBar AwesomeBarState

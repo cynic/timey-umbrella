@@ -101,8 +101,10 @@ viewChecklist model =
           [ button
               [ onClick <| DeleteChecklistItem id
               , class "skeu-convex capsule-left"
+              , title "Push off to another day…"
               ]
-              [ text "✖️" ]
+              [ text "⌛"
+              ]
           , span
               [ class "description skeu-convex"
               , title s
