@@ -161,7 +161,7 @@ parse s =
     , isTomorrow
     , isDuration
     ]
-    (tokenise s |>Debug.log "Tokens")
+    (tokenise s)
     s
     []
 

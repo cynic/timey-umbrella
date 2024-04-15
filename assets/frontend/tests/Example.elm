@@ -4,6 +4,7 @@ import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Test exposing (..)
 import Main exposing (tokenise, parse)
+import View exposing (isWithinOffset)
 import Data exposing (..)
 
 tokenise_tests : Test
@@ -148,6 +149,28 @@ parse_tests =
             , (Description, Nothing, Offset 34 4)
             ]
             (parse "hello, today tomorrow  this is my name")
+      ]
+    ]
+
+isWithinOffset_tests : Test
+isWithinOffset_tests =
+  describe "The isWithinOffset function"
+    [ describe "when given an offset and position"
+      [ test "returns true if the position is within the offset" <|
+        \_ ->
+          Expect.equal True (isWithinOffset 3 6 4)
+      , test "returns true if the position is at the start of the offset" <|
+        \_ ->
+          Expect.equal True (isWithinOffset 3 6 3)
+      , test "returns true if the position is at the end of the offset" <|
+        \_ ->
+          Expect.equal True (isWithinOffset 3 6 9)
+      , test "returns false if the position is before the offset" <|
+        \_ ->
+          Expect.equal False (isWithinOffset 3 6 2)
+      , test "returns false if the position is after the offset" <|
+        \_ ->
+          Expect.equal False (isWithinOffset 3 6 10)
       ]
     ]
 
