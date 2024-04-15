@@ -114,8 +114,9 @@ findMaxDuration list =
         state
   ) Nothing list
 
-parse : List Offset -> String -> List (Token, Maybe String, Offset) -> List (Token, Maybe String, Offset)
-parse offsets s acc =
+-- Does the REAL work of parsing!
+parse_helper : List ParserFunction -> List Offset -> String -> List (Token, Maybe String, Offset) -> List (Token, Maybe String, Offset)
+parse_helper parserFunctions offsets s acc =
   let
     strings : List String
     strings = List.map (\{offset, extent} -> String.slice offset (offset + extent) s) offsets
@@ -125,10 +126,7 @@ parse offsets s acc =
         List.reverse acc
       h::tail ->
         findFirst
-          [ isToday
-          , isTomorrow
-          , isDuration
-          ]
+          parserFunctions
           strings
         |> Maybe.map (\(token, completion, n) ->
           let
@@ -145,19 +143,31 @@ parse offsets s acc =
           in
             case tail of
               h2::_ ->
-                parse (List.drop n offsets) s ((Description, Nothing, { offset = h.offset + h.extent, extent = (h2.offset - (h.offset + h.extent)) }) :: newAcc)
+                parse_helper parserFunctions (List.drop n offsets) s ((Description, Nothing, { offset = h.offset + h.extent, extent = (h2.offset - (h.offset + h.extent)) }) :: newAcc)
               [] ->
-                parse (List.drop n offsets) s newAcc
+                parse_helper parserFunctions (List.drop n offsets) s newAcc
         ) |> Maybe.withDefault
           ( case tail of
               h2::_ ->
-                parse tail s ((Description, Nothing, { h | extent = h2.offset - h.offset }) :: acc)
+                parse_helper parserFunctions tail s ((Description, Nothing, { h | extent = h2.offset - h.offset }) :: acc)
               [] ->
-                parse tail s ((Description, Nothing, h) :: acc)
+                parse_helper parserFunctions tail s ((Description, Nothing, h) :: acc)
           )
 
-tokenise : String -> Int -> Maybe Offset -> List Offset -> List Offset
-tokenise s i current acc =
+parse : String -> List (Token, Maybe String, Offset)
+parse s =
+  parse_helper
+    [ isToday
+    , isTomorrow
+    , isDuration
+    ]
+    (tokenise s |>Debug.log "Tokens")
+    s
+    []
+
+-- this does the REAL work of tokenising!
+tokenise_helper : String -> Int -> Maybe Offset -> List Offset -> List Offset
+tokenise_helper s i current acc =
   case (String.slice i (i+1) s, current) of
     -- end-of-input cases
     ("", Nothing) ->
@@ -166,13 +176,17 @@ tokenise s i current acc =
       List.reverse (c :: acc)
     -- whitespace cases
     (" ", Nothing) ->
-      tokenise s (i+1) Nothing acc
+      tokenise_helper s (i+1) Nothing acc
     (" ", Just c) ->
-      tokenise s (i+1) Nothing (c :: acc)
+      tokenise_helper s (i+1) Nothing (c :: acc)
     (_, Nothing) ->
-      tokenise s (i+1) (Just { offset = i, extent = 1 }) acc
+      tokenise_helper s (i+1) (Just { offset = i, extent = 1 }) acc
     (_, Just c) ->
-      tokenise s (i+1) (Just { c | extent = c.extent + 1 }) acc
+      tokenise_helper s (i+1) (Just { c | extent = c.extent + 1 }) acc
+
+tokenise : String -> List Offset
+tokenise s =
+  tokenise_helper s 0 Nothing []
 
 updateSetString : String -> Int -> AwesomeBarState -> Model -> (Model, Cmd Msg)
 updateSetString s i x model =
@@ -182,7 +196,7 @@ updateSetString s i x model =
           { x
           | s = s
           , i = i
-          , parse = parse (tokenise s 0 Nothing []) s []
+          , parse = parse s
           }
     }
   , Ports.shiftCaret ({-Debug.log "Requesting caret shift to"-} i)

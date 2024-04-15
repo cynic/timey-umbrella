@@ -172,3 +172,5 @@ type alias DateSearch =
   , direction : DateSearchDirection
   , predicate : Date -> Bool
   }
+
+type alias ParserFunction = List String -> Maybe (Token, Maybe String, Int)
