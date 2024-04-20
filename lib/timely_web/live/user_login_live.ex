@@ -26,7 +26,7 @@ defmodule TimelyWeb.UserLoginLive do
           </.link>
         </:actions>
         <:actions>
-          <.button phx-disable-with="Signing in..." class="w-full">
+          <.button id="sign_in" phx-disable-with="Signing in..." class="w-full">
             Sign in <span aria-hidden="true">→</span>
           </.button>
         </:actions>
