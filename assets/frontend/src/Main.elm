@@ -130,28 +130,54 @@ parse_helper parserFunctions offsets s acc =
           strings
         |> Maybe.map (\(token, completion, n) ->
           let
+            parse_offset = h.offset
+            parse_extent =
+              h::List.take (n - 1) tail
+              |> List.Extra.last
+              |> Maybe.map (\{offset, extent} -> extent + offset - h.offset)
+              |> Maybe.withDefault h.extent
             combinedOffset =
-              { offset = h.offset
-              , extent =
-                  List.drop (n - 1) offsets
-                  |> List.head
-                  |> Maybe.map (\last -> last.offset + last.extent - h.offset)
-                  |> Maybe.withDefault 1
-              }
+              Offset parse_offset parse_extent
             newAcc =
               (token, completion, combinedOffset) :: acc
           in
             case tail of
               h2::_ ->
-                parse_helper parserFunctions (List.drop n offsets) s ((Description, Nothing, { offset = h.offset + h.extent, extent = (h2.offset - (h.offset + h.extent)) }) :: newAcc)
+                parse_helper
+                  parserFunctions
+                  (List.drop (n - 1) tail)
+                  s
+                  newAcc
               [] ->
-                parse_helper parserFunctions (List.drop n offsets) s newAcc
+                parse_helper
+                  parserFunctions
+                  (List.drop n offsets)
+                  s
+                  newAcc
         ) |> Maybe.withDefault
           ( case tail of
               h2::_ ->
-                parse_helper parserFunctions tail s ((Description, Nothing, { h | extent = h2.offset - h.offset }) :: acc)
+                parse_helper
+                  parserFunctions
+                  tail
+                  s
+                  ( ( Description
+                    , Nothing
+                    , { h
+                      | extent = h2.offset - h.offset - 1
+                      }
+                    ) :: acc
+                  )
               [] ->
-                parse_helper parserFunctions tail s ((Description, Nothing, h) :: acc)
+                parse_helper
+                  parserFunctions
+                  tail
+                  s
+                  ( ( Description
+                    , Nothing
+                    , h
+                    ) :: acc
+                  )
           )
 
 parse : String -> List (Token, Maybe String, Offset)

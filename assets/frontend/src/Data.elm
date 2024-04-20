@@ -173,4 +173,6 @@ type alias DateSearch =
   , predicate : Date -> Bool
   }
 
-type alias ParserFunction = List String -> Maybe (Token, Maybe String, Int)
+type alias ParserFunction =
+  -- the token, the completion (if any), the number of tokens swallowed
+  List String -> Maybe (Token, Maybe String, Int)

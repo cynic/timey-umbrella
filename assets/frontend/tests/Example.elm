@@ -54,10 +54,10 @@ parse_tests =
       [ test "links non-semantic values to nothing" <|
         \_ ->
           Expect.equal
-            [ (Description, Nothing, Offset 0 7)
-            , (Description, Nothing, Offset 7 5)
-            , (Description, Nothing, Offset 12 3)
-            , (Description, Nothing, Offset 15 3)
+            [ (Description, Nothing, Offset 0 6)
+            , (Description, Nothing, Offset 7 4)
+            , (Description, Nothing, Offset 12 2)
+            , (Description, Nothing, Offset 15 2)
             , (Description, Nothing, Offset 18 4)
             ]
             (parse "hello, this is my name")
