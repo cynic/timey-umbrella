@@ -1,6 +1,21 @@
 const {By, Builder, Browser, until} = require('selenium-webdriver');
 const assert = require("assert");
 
+let sendKeysFast =
+  async function(element, s) {
+    await element.sendKeys(s);
+  };
+
+let sendKeysSlow =
+  async function(element, s) {
+    // convert 's' into an array of characters
+    let chars = s.split('');
+    // for each of the chars, do something
+    chars.forEach(async function(c) {
+      await element.sendKeys(c);
+    });
+  };
+
 (async function firstTest() {
   let driver;
   
@@ -26,20 +41,20 @@ const assert = require("assert");
       driver.wait(until.urlIs('http://localhost:4000'));
     }
     driver.wait(until.elementLocated(By.id('elm-app-container')));
-    let elm_app = await driver.findElement(By.id('elm-app-container'));
+    // let elm_app = await driver.findElement(By.id('elm-app-container'));
     //await elm_app.sendKeys(' ');
     await driver.actions().sendKeys(' ').perform();
     
     driver.wait(until.elementLocated(By.id('awesomebar')));
 
-    let awesomebar = await driver.findElement(By.id('awesomebar'));
+    var awesomebar = await driver.findElement(By.id('awesomebar'));
 
     let noSpaceMessage = 'hello-world-this-is-me-life-should-be-fun-for-everyone';
-    await awesomebar.sendKeys(noSpaceMessage);
-    // driver.wait(until.elementIsNotVisible(By.id('awesomebar')), 5000);
-  
-    let onScreen = await awesomebar.getText();
-    // driver.wait(until.elementIsNotVisible(By.id('awesomebar')), 5000);
+    await sendKeysSlow(awesomebar, noSpaceMessage);
+    awesomebar = await driver.findElement(By.id('awesomebar'));
+    let onScreen =
+      await awesomebar.getText();
+      // await awesomebar.getText();
 
     assert.equal(onScreen, noSpaceMessage);
   } catch (e) {
