@@ -109,6 +109,20 @@ More than the ordering, as well:
 It seems (on FF, 22 January 2024) to be quite reliable now. So let's see, in sha Allah…
 */
 
+/// Ready for the next input event.
+const STATE_READY = 0;
+/// AWAITING_ELM ends when shiftCaret is called; OR
+/// when we're composing.
+const STATE_AWAITING_ELM = 1;
+/// AWAITING_DOM ends when setCaretPosition is called
+/// from the mutation-observer; OR
+/// if 50ms has passed since the start of it
+const STATE_AWAITING_DOM = 2; 
+/// At the end of AWAITING_DOM, go back to READY
+eventStack = []; // to be processed one at a time
+awaiting_timeout_id = -1;
+inputMachine_state = STATE_READY;
+
 caretPosition = 0; // this is set via the `shiftCaret` port
 isComposing = false;
 lastInputEvent = null;
@@ -231,16 +245,35 @@ function countForwardsTo(char_count) {
 }
 
 function setCaretPosition() {
+  if (inputMachine_state !== STATE_AWAITING_DOM) {
+    console.log(`setCaretPosition: inputMachine_state is ${inputMachine_state}, returning.`);
+    return;
+  }
+  if (awaiting_timeout_id >= 0) {
+    clearTimeout(awaiting_timeout_id);
+    awaiting_timeout_id = -1;
+  }
   //console.log(`Setting caret position to ${caretPosition}`);
   let s = document.getSelection();
   let totalLen = userTextLength();
   let { node, offset } = countForwardsTo(Math.min(totalLen, caretPosition));
   let r = document.createRange();
-  r.setStart(textNodeIn(node), offset);
-  s.removeAllRanges();
-  s.addRange(r);
-  s.collapseToStart();
+  if (node !== undefined) {
+    r.setStart(textNodeIn(node), offset);
+    s.removeAllRanges();
+    s.addRange(r);
+    s.collapseToStart();
+  } else {
+    console.log("setCaretPosition: node undefined, ignoring.");
+  }
   // caretTracker = { start: caretPosition, end: caretPosition };
+  inputMachine_state = STATE_READY; // and that should be a wrap, folks.
+  console.log("EVENT COMPLETE.");
+  if (eventStack.length > 0) {
+    console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
+    beforeInputListener(eventStack.shift());
+  }
+
 }
 
 function countBackwardsFrom(node, char_count) {
@@ -321,13 +354,15 @@ function getCaretPositions() {
 }
 
 function checkCaretChange() {
-  if (bar === null) {
+  if (bar === null || inputMachine_state !== STATE_READY) {
     return;
   }
+  console.log(`checkCaretChange: caretTracker is initially (${caretTracker.start}, ${caretTracker.end})`);
   let old = caretTracker;
   let tmp = getCaretPositions();
   if (tmp) {
     caretTracker = tmp;
+    console.log(`checkCaretChange: caretTracker is now (${caretTracker.start}, ${caretTracker.end})`);
     // console.log(caretTracker);
     if (old != caretTracker && caretTracker.start === caretTracker.end) {
       app.ports.caretMoved.send(caretTracker);
@@ -355,12 +390,18 @@ function trackCompositionEnd(e) {
 
 function beforeInputListener(event) {
   event.stopPropagation();
+  if (inputMachine_state !== STATE_READY) {
+    console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event to stack.`);
+    eventStack.push(event);
+    return;
+  }
   if (event.inputType.match("^history..do")) {
     return; // don't handle this.
   }
   if (isComposing) {
     // console.log(`Got ${event.inputType} but still composing.`);
     lastInputEvent = event;
+    inputMachine_state = STATE_READY;
     return; // let the composition continue; come back when it's done.
   }
   if (event.inputType.match("^(insert|delete).*")) {
@@ -384,6 +425,7 @@ function beforeInputListener(event) {
         , end: range.endOffset
       };
     // console.log(packaged);
+    inputMachine_state = STATE_AWAITING_ELM;
     app.ports.awesomeBarInput.send(packaged);
   } else {
     // Here I need to get the selection position as well.
@@ -418,7 +460,8 @@ function beforeInputListener(event) {
         , start: start
         , end: end
       };
-    // console.log(packaged);
+    console.log(packaged);
+    inputMachine_state = STATE_AWAITING_ELM;
     app.ports.awesomeBarInput.send(packaged);
   }
 }
@@ -483,6 +526,10 @@ function goodbyeBar() {
   caretTracker = { start: 0, end: 0 };
   // Tell Elm that it can now get rid of the element
   app.ports.listenerRemoved.send(null);
+  if (awaiting_timeout_id >= 0) {
+    clearTimeout(awaiting_timeout_id);
+    awaiting_timeout_id = -1;
+  }
 }
 
 function initializeBar() {
@@ -498,18 +545,32 @@ function initializeBar() {
 
   // Start observing the target node for configured mutations
   observer.observe(bar, { characterData: true, childList: true, subtree: true });
+  inputMachine_state = STATE_READY;
 }
 
 app.ports.displayAwesomeBar.subscribe(initializeBar);
 app.ports.hideAwesomeBar.subscribe(goodbyeBar);
 
 app.ports.shiftCaret.subscribe((p) => {
+  if (inputMachine_state !== STATE_AWAITING_ELM) {
+    console.log(`Shift-caret(${p}) message received, but inputMachine_state is ${inputMachine_state}`);
+    return;
+  }
   // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
-  const totalLen = userTextLength();
+  inputMachine_state = STATE_AWAITING_DOM;
+  console.log(`Elm says: caret position should be set to ${p}`);
+  awaiting_timeout_id =
+    setTimeout(() =>
+      { awaiting_timeout_id = -1;
+        console.log("Calling setCaretPosition() out of sheer desperation.");
+        setCaretPosition();
+      }, 50
+    );
+  // const totalLen = userTextLength();
   caretPosition = p;
   caretTracker = { start: caretPosition, end: caretPosition };
-  if (totalLen >= p) {
-    // go ahead & invoke now.
-    setCaretPosition();
-  }
+  // if (totalLen >= p) {
+  //   // go ahead & invoke now.
+  //   setCaretPosition();
+  // }
 });

@@ -1,5 +1,6 @@
 const {By, Builder, Browser, until} = require('selenium-webdriver');
 const assert = require("assert");
+const { Type, Level, addConsoleHandler, installConsoleHandler } = require('selenium-webdriver/lib/logging');
 
 let sendKeysFast =
   async function(element, s) {
@@ -20,9 +21,11 @@ let sendKeysSlow =
   let driver;
   
   try {
-    driver = await new Builder().forBrowser(Browser.FIREFOX).build();
+    driver = await new Builder()
+      .forBrowser(Browser.FIREFOX)
+      .build();
     await driver.get('http://localhost:4000/');
-  
+
     let title = await driver.getTitle();
     assert.match(title, /Timely/);
   
@@ -52,14 +55,15 @@ let sendKeysSlow =
     let noSpaceMessage = 'hello-world-this-is-me-life-should-be-fun-for-everyone';
     await sendKeysSlow(awesomebar, noSpaceMessage);
     awesomebar = await driver.findElement(By.id('awesomebar'));
+    driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{noSpaceMessage.length}`)));
     let onScreen =
       await awesomebar.getText();
       // await awesomebar.getText();
 
     assert.equal(onScreen, noSpaceMessage);
+    driver.quit();
   } catch (e) {
-    console.log(e)
-  } finally {
-    await driver.quit();
+    console.log("Oh noes!  I gots an errorz!  Possibly a failing test…");
+    // console.log(e)
   }
 }())
