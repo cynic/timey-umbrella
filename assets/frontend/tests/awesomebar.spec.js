@@ -1,6 +1,8 @@
 const {By, Builder, Browser, until} = require('selenium-webdriver');
 const assert = require("assert");
+const firefox = require('selenium-webdriver/firefox');
 const { Type, Level, addConsoleHandler, installConsoleHandler } = require('selenium-webdriver/lib/logging');
+const LogInspector = require('selenium-webdriver/bidi/logInspector');
 
 let sendKeysFast =
   async function(element, s) {
@@ -23,8 +25,17 @@ let sendKeysSlow =
   try {
     driver = await new Builder()
       .forBrowser(Browser.FIREFOX)
+      .setFirefoxOptions(new firefox.Options().enableBidi())
       .build();
     await driver.get('http://localhost:4000/');
+
+    let logEntry = null
+    const inspector = await LogInspector(driver)
+    await inspector.onConsoleEntry(
+      (log) =>
+        { console.log(`[${log.level}] ${log.text}`);
+        }
+    );
 
     let title = await driver.getTitle();
     assert.match(title, /Timely/);
@@ -64,6 +75,6 @@ let sendKeysSlow =
     driver.quit();
   } catch (e) {
     console.log("Oh noes!  I gots an errorz!  Possibly a failing test…");
-    // console.log(e)
+    console.log(e)
   }
 }())
