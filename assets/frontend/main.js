@@ -390,11 +390,6 @@ function trackCompositionEnd(e) {
 
 function beforeInputListener(event) {
   event.stopPropagation();
-  if (inputMachine_state !== STATE_READY) {
-    console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event to stack.`);
-    eventStack.push(event);
-    return;
-  }
   if (event.inputType.match("^history..do")) {
     return; // don't handle this.
   }
@@ -411,6 +406,14 @@ function beforeInputListener(event) {
     // 
     // It will be notified about its characteristics instead.
     event.preventDefault();
+    // if we don't preventDefault BEFORE we check the state machine, then there
+    // is a chance that the DOM will update with this character on insert, which
+    // will duplicate a character out-of-order.
+  }
+  if (inputMachine_state !== STATE_READY) {
+    console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event (≈'${event.data}') to stack.`);
+    eventStack.push(event);
+    return;
   }
   // console.log(event);
   if (event.inputType === "insertReplacementText") {

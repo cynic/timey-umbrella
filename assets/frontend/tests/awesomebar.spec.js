@@ -87,10 +87,10 @@ suite(function(env) {
     let noSpaceMessage = 'hello-world-this-is-me-life-should-be-fun-for-everyone';
     await sendKeysSlow(awesomebar, noSpaceMessage);
     awesomebar = await driver.findElement(By.id('awesomebar'));
-    driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{noSpaceMessage.length}`)));
+    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${noSpaceMessage.length},}`)));
     let actual = await awesomebar.getText()
     assert.strictEqual(actual, noSpaceMessage);
-    return new Promise(() => assert.ok(true));
+    return new Promise((resolve) => { assert.ok(true); resolve(); });
   });
 
 }, { browsers: ['firefox'] });
