@@ -1,7 +1,7 @@
+const {suite} = require('selenium-webdriver/testing');
 const {By, Builder, Browser, until} = require('selenium-webdriver');
 const assert = require("assert");
 const firefox = require('selenium-webdriver/firefox');
-const { Type, Level, addConsoleHandler, installConsoleHandler } = require('selenium-webdriver/lib/logging');
 const LogInspector = require('selenium-webdriver/bidi/logInspector');
 
 let sendKeysFast =
@@ -19,14 +19,16 @@ let sendKeysSlow =
     });
   };
 
-(async function firstTest() {
+suite(function(env) {
   let driver;
-  
-  try {
+
+  beforeEach(async function() {
+    this.timeout(10000);
     driver = await new Builder()
       .forBrowser(Browser.FIREFOX)
       .setFirefoxOptions(new firefox.Options().enableBidi())
       .build();
+    await driver.manage().setTimeouts({implicit: 500});    
     await driver.get('http://localhost:4000/');
 
     let logEntry = null
@@ -40,10 +42,7 @@ let sendKeysSlow =
     let title = await driver.getTitle();
     assert.match(title, /Timely/);
   
-    // mmm, I like expected conditions more, but…
-    await driver.manage().setTimeouts({implicit: 500});
-
-    // check if a #user_email element exists
+    // are we on the login page??  If so, log in.
     let email = await driver.findElement(By.id('user_email'));
     if (email) { // then I'm actually at the login page
       await email.sendKeys('cinyc.s@gmail.com');
@@ -54,9 +53,24 @@ let sendKeysSlow =
 
       driver.wait(until.urlIs('http://localhost:4000'));
     }
-    driver.wait(until.elementLocated(By.id('elm-app-container')));
-    // let elm_app = await driver.findElement(By.id('elm-app-container'));
-    //await elm_app.sendKeys(' ');
+    return driver.wait(until.elementLocated(By.id('elm-app-container')));
+  });
+
+  afterEach(async function() {
+    return driver.quit();
+  });
+
+  it("activates the awesomebar when space is pressed", async function() {
+    // assert.rejects(await driver.findElement(By.id('awesomebar')));
+
+    await driver.actions().sendKeys(' ').perform();
+    
+    await driver.wait(until.elementLocated(By.id('awesomebar')));
+
+    assert.doesNotReject(await driver.findElement(By.id('awesomebar')));
+  });
+
+  it("accepts input with no spaces", async function() {
     await driver.actions().sendKeys(' ').perform();
     
     driver.wait(until.elementLocated(By.id('awesomebar')));
@@ -72,9 +86,6 @@ let sendKeysSlow =
       // await awesomebar.getText();
 
     assert.equal(onScreen, noSpaceMessage);
-    driver.quit();
-  } catch (e) {
-    console.log("Oh noes!  I gots an errorz!  Possibly a failing test…");
-    console.log(e)
-  }
-}())
+  });
+
+}, { browsers: ['firefox'] });

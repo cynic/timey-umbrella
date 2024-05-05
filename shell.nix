@@ -6,6 +6,6 @@
       elmPackages.elm elmPackages.elm-format
       elixir erlang rebar3
       pgadmin4-desktopmode
-      firefox
+      firefox nodePackages.mocha
     ];
 }

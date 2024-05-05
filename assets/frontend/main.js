@@ -268,7 +268,7 @@ function setCaretPosition() {
   }
   // caretTracker = { start: caretPosition, end: caretPosition };
   inputMachine_state = STATE_READY; // and that should be a wrap, folks.
-  console.log("EVENT COMPLETE.");
+  console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
   if (eventStack.length > 0) {
     console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
     beforeInputListener(eventStack.shift());
@@ -460,7 +460,7 @@ function beforeInputListener(event) {
         , start: start
         , end: end
       };
-    console.log(packaged);
+    console.log(JSON.stringify(packaged));
     inputMachine_state = STATE_AWAITING_ELM;
     app.ports.awesomeBarInput.send(packaged);
   }
