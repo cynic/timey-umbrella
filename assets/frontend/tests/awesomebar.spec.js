@@ -66,7 +66,6 @@ suite(function(env) {
   });
 
   it("activates the awesomebar when space is pressed", async function() {
-    this.timeout(10000);
     // assert.rejects(await driver.findElement(By.id('awesomebar')));
 
     await driver.actions().sendKeys(' ').perform();
@@ -77,7 +76,6 @@ suite(function(env) {
   });
 
   it("accepts input with no spaces", async function() {
-    this.timeout(10000);
     await driver.actions().sendKeys(' ').perform();
     
     driver.wait(until.elementLocated(By.id('awesomebar')));
@@ -93,4 +91,19 @@ suite(function(env) {
     return new Promise((resolve) => { assert.ok(true); resolve(); });
   });
 
+  it("accepts input with spaces", async function() {
+    await driver.actions().sendKeys(' ').perform();
+    
+    driver.wait(until.elementLocated(By.id('awesomebar')));
+
+    var awesomebar = await driver.findElement(By.id('awesomebar'));
+
+    let spaceMessage = "hi, what's up?";
+    await sendKeysSlow(awesomebar, spaceMessage);
+    awesomebar = await driver.findElement(By.id('awesomebar'));
+    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${spaceMessage.length},}`)));
+    let actual = await awesomebar.getText()
+    assert.strictEqual(actual, spaceMessage);
+    return new Promise((resolve) => { assert.ok(true); resolve(); });
+  });
 }, { browsers: ['firefox'] });
