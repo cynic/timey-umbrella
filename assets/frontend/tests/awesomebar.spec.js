@@ -19,6 +19,23 @@ let sendKeysSlow =
     });
   };
 
+let sendKeys = sendKeysFast;
+
+let checkAwesomebarMessage =
+  async function(driver, send, expected) {
+    await driver.actions().sendKeys(' ').perform();
+    
+    driver.wait(until.elementLocated(By.id('awesomebar')));
+
+    var awesomebar = await driver.findElement(By.id('awesomebar'));
+
+    await send(awesomebar);
+    awesomebar = await driver.findElement(By.id('awesomebar'));
+    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${expected.length},}`)));
+    let actual = await awesomebar.getText()
+    assert.strictEqual(actual, expected);
+    return new Promise((resolve) => { assert.ok(true); resolve(); });  };
+
 suite(function(env) {
   let driver;
 
@@ -56,6 +73,7 @@ suite(function(env) {
   });
 
   beforeEach(async function() {
+    this.timeout(3500); // sometimes a bit slow.
     driver.get('http://localhost:4000/');
     return driver.wait(until.elementLocated(By.id('elm-app-container')));
   });
@@ -76,34 +94,51 @@ suite(function(env) {
   });
 
   it("accepts input with no spaces", async function() {
-    await driver.actions().sendKeys(' ').perform();
-    
-    driver.wait(until.elementLocated(By.id('awesomebar')));
-
-    var awesomebar = await driver.findElement(By.id('awesomebar'));
-
-    let noSpaceMessage = 'hello-world-this-is-me-life-should-be-fun-for-everyone';
-    await sendKeysSlow(awesomebar, noSpaceMessage);
-    awesomebar = await driver.findElement(By.id('awesomebar'));
-    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${noSpaceMessage.length},}`)));
-    let actual = await awesomebar.getText()
-    assert.strictEqual(actual, noSpaceMessage);
-    return new Promise((resolve) => { assert.ok(true); resolve(); });
+    this.timeout(3000); // sometimes takes just under 2s to complete, so this is for safety
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, 'hello-world-this-is-me-life-should-be-fun-for-everyone'),
+      'hello-world-this-is-me-life-should-be-fun-for-everyone'
+    );
   });
 
   it("accepts input with spaces", async function() {
-    await driver.actions().sendKeys(' ').perform();
-    
-    driver.wait(until.elementLocated(By.id('awesomebar')));
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, "hi, what's up?"),
+      "hi, what's up?"
+    );
+  });
 
-    var awesomebar = await driver.findElement(By.id('awesomebar'));
+  it("accepts input with multiple spaces prefixed", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, "    yo!"),
+      "    yo!"
+    );
+  });
 
-    let spaceMessage = "hi, what's up?";
-    await sendKeysSlow(awesomebar, spaceMessage);
-    awesomebar = await driver.findElement(By.id('awesomebar'));
-    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${spaceMessage.length},}`)));
-    let actual = await awesomebar.getText()
-    assert.strictEqual(actual, spaceMessage);
-    return new Promise((resolve) => { assert.ok(true); resolve(); });
+  it("accepts input with one space prefixed", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, " yo!"),
+      " yo!"
+    );
+  });
+
+  it("accepts input with multiple spaces suffixed", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, "yo!    "),
+      "yo!    "
+    );
+  });
+
+  it("accepts input with one space suffixed", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      (e) => sendKeys(e, "yo! "),
+      "yo! "
+    );
   });
 }, { browsers: ['firefox'] });
