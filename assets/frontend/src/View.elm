@@ -239,11 +239,11 @@ viewAwesomeBar model state =
 --                        , html ++ [ tokenWithoutCompletion state.s token <| String.slice ofs.offset (ofs.offset + ofs.extent) state.s ]
                         )
                   )
-                  (Nothing, List.length state.parse, [])
+                  (Nothing, String.length state.s, [])
                   state.parse
                 |> (\(_, count, html) ->
                     if count > 0 then
-                      text (String.repeat count "-") :: html
+                      text (String.repeat count " ") :: html
                     else
                       html
                   )
