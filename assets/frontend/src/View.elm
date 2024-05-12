@@ -199,29 +199,80 @@ viewAwesomeBar model state =
             [ contenteditable True
             , id "awesomebar"
             ]
-            ( let
-                last = List.drop (List.length state.parse - 1) state.parse |> List.head
-                first = List.head state.parse
-                prefix =
-                  Maybe.map (\(_, _, { offset }) ->
-                    text <| String.repeat offset " "
-                  ) first
-                suffix =
-                  Maybe.map (\(_, _, { offset, extent }) ->
-                    text <| String.repeat (String.length state.s - (offset + extent)) " "
-                  ) last
-                tokenHtml =
-                  List.map (tokenToView state.s state.i) state.parse
-              in
-                case (prefix, suffix) of
-                  (Nothing, Nothing) ->
-                    tokenHtml
-                  (Just prefixHtml, Nothing) ->
-                    prefixHtml :: tokenHtml
-                  (Nothing, Just suffixHtml) ->
-                    tokenHtml ++ [suffixHtml]
-                  (Just prefixHtml, Just suffixHtml) ->
-                    (prefixHtml :: tokenHtml) ++ [suffixHtml]
+            ( if List.isEmpty state.parse then
+                if String.isEmpty state.s then
+                  [ text "What do you want to do today?" ]
+                else
+                  [ text state.s ]
+              else
+                List.foldr
+                  (\(token, completion, ofs) (prev, count, html) ->
+                    case prev of
+                      Nothing ->
+                        -- there's nothing to the right of this token.
+                        -- offset+extent will therefore give me the end of the TOKENISED input.
+                        -- There may be additional text—whitespace?—after that.
+                        -- So, the first thing to check is remaining-text and if it's there,
+                        -- add it to the HTML.
+                        if ({-Debug.log "A" <| -}ofs.offset + ofs.extent) == ({-Debug.log "B" <| -}String.length state.s) then
+                          -- there is nothing to add to the end.  That's fine, then.
+                          ( Just (token, {prev_offset = ofs.offset, prev_extent = ofs.extent})
+                          , count - ofs.extent
+                          , [ tokenToView state.s state.i (token, completion, ofs) ]
+                          )
+                        else
+                          -- there is additional text to add at the end.
+                          ( Just (token, {prev_offset = ofs.offset, prev_extent = ofs.extent})
+                          , ofs.offset
+                          , [ tokenToView state.s state.i (token, completion, ofs)
+                              -- String.slice's second argument is an exclusive index
+                            , text <| String.slice (ofs.offset + ofs.extent) (String.length state.s) state.s
+                            ]
+                          )
+                      Just (prev_token, {prev_offset, prev_extent}) ->
+                        -- I must include text between the previous token and this one.
+                        ( Just (token, {prev_offset = ofs.offset, prev_extent = ofs.extent})
+                        , ofs.offset
+                        , tokenToView state.s state.i (token, completion, ofs)
+                          :: text (String.slice (ofs.offset + ofs.extent) (prev_offset) state.s)
+                          :: html
+--                        , html ++ [ tokenWithoutCompletion state.s token <| String.slice ofs.offset (ofs.offset + ofs.extent) state.s ]
+                        )
+                  )
+                  (Nothing, List.length state.parse, [])
+                  state.parse
+                |> (\(_, count, html) ->
+                    if count > 0 then
+                      text (String.repeat count "-") :: html
+                    else
+                      html
+                  )
+            -- ( let
+            --     last = List.drop (List.length state.parse - 1) state.parse |> List.head
+            --     first = List.head state.parse
+            --     prefix =
+            --       Maybe.map (\(_, _, { offset }) ->
+            --         text <| String.repeat offset "-"
+            --       ) first
+            --     suffix =
+            --       Maybe.map (\(_, _, { offset, extent }) ->
+            --         text <| String.repeat (String.length state.s - (offset + extent)) "*"
+            --       ) last
+            --     tokenHtml =
+            --       case List.map (tokenToView state.s state.i) state.parse of
+            --         [] -> [ text state.s ]
+            --         tokens -> tokens
+            --   in
+            --     case (prefix, suffix) of
+            --       (Nothing, Nothing) ->
+            --         tokenHtml
+            --       (Just prefixHtml, Nothing) ->
+            --         prefixHtml :: tokenHtml
+            --       (Nothing, Just suffixHtml) ->
+            --         tokenHtml ++ [suffixHtml]
+            --       (Just prefixHtml, Just suffixHtml) ->
+            --         (prefixHtml :: tokenHtml) ++ [suffixHtml]
+            -- )
             )
           )
         ]

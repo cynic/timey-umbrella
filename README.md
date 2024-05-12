@@ -1,3 +1,11 @@
+# Testing
+
+Within `assets/frontend`, run:
+- `mocha tests/awesomebar.spec.js`
+- `npx elm-test`
+
+# Inputs handled
+
 From: https://w3c.github.io/input-events/#interface-InputEvent-Attributes
 
 ```

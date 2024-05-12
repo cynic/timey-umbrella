@@ -220,18 +220,19 @@ document.addEventListener("keydown", (e) => {
 function userTextLength() {
   var char_count = 0;
   for (var current = bar.firstChild; current; current = current.nextSibling) {
-    // console.log(current);
+    //console.log(`userTextLength, looking at:`, current, `, char_count=${char_count}`);
     char_count += current.textContent.length;
     if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
       char_count -= parseInt(current.dataset.completionlen);
     }
   }
+  //console.log(`userTextLength, final count ${char_count}`);
   return char_count;
 }
 
 function countForwardsTo(char_count) {
   for (var current = bar.firstChild; current; current = current.nextSibling) {
-    // console.log(current);
+    //console.log(`countForwardsTo, counting:`, current);
     var len = current.textContent.length;
     if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
       len -= parseInt(current.dataset.completionlen);
@@ -278,7 +279,7 @@ function setCaretPosition() {
 
 function countBackwardsFrom(node, char_count) {
   for (var current = node; current; current = current.previousSibling) {
-    // console.log(current);
+    console.log(`countBackwardsFrom, looking at `, current);
     char_count += current.textContent.length;
     if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
       char_count -= parseInt(current.dataset.completionlen);
@@ -295,6 +296,7 @@ function countNodesForwards(node, count) {
       char_count -= parseInt(current.dataset.completionlen);
     }
   }
+  console.log(`countNodesForwards, final count ${char_count}`);
   return char_count;
 }
 
@@ -357,12 +359,12 @@ function checkCaretChange() {
   if (bar === null || inputMachine_state !== STATE_READY) {
     return;
   }
-  console.log(`checkCaretChange: caretTracker is initially (${caretTracker.start}, ${caretTracker.end})`);
+  //console.log(`checkCaretChange: caretTracker is initially (${caretTracker.start}, ${caretTracker.end})`);
   let old = caretTracker;
   let tmp = getCaretPositions();
   if (tmp) {
     caretTracker = tmp;
-    console.log(`checkCaretChange: caretTracker is now (${caretTracker.start}, ${caretTracker.end})`);
+    //console.log(`checkCaretChange: caretTracker is now (${caretTracker.start}, ${caretTracker.end})`);
     // console.log(caretTracker);
     if (old != caretTracker && caretTracker.start === caretTracker.end) {
       app.ports.caretMoved.send(caretTracker);
@@ -471,16 +473,16 @@ function beforeInputListener(event) {
 
 function textNodeIn(node) {
   if (node.nodeType === Node.TEXT_NODE) {
-    // console.log(`Returning node ${node} with nodeType ${node.nodeType}, wanted ${Node.TEXT_NODE}`);
+    //console.log(`Returning node ${node} with nodeType ${node.nodeType}, wanted ${Node.TEXT_NODE}`);
     return node;
   }
   var stack = [node];
   while (stack.length > 0) {
-    // console.log(stack);
+    //console.log(`textNodeIn, stack=`, stack);
     var current = stack.pop();
     for (var i = 0; i < current.childNodes.length; i++) {
       if (current.childNodes[i].nodeType === Node.TEXT_NODE) {
-        // console.log(`Returning node ${current.childNodes[i]} with nodeType ${current.childNodes[i].nodeType} (wanted ${Node.TEXT_NODE})`);
+        //console.log(`Returning node ${current.childNodes[i]} with nodeType ${current.childNodes[i].nodeType} (wanted ${Node.TEXT_NODE})`);
         return current.childNodes[i];
       } else {
         stack.push(current.childNodes[i]);
