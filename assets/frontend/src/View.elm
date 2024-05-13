@@ -200,10 +200,7 @@ viewAwesomeBar model state =
             , id "awesomebar"
             ]
             ( if List.isEmpty state.parse then
-                if String.isEmpty state.s then
-                  [ text "What do you want to do today?" ]
-                else
-                  [ text state.s ]
+                [ text state.s ]
               else
                 List.foldr
                   (\(token, completion, ofs) (prev, count, html) ->

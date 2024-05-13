@@ -35,6 +35,12 @@ body {
   white-space: pre;
 }
 
+#awesomebar:empty {
+  height: calc(14px + 1.625em);
+  content: "Hello!";
+  caret-color: transparent;
+}
+
 #awesomebar:active {
   border: none;
 }

@@ -269,7 +269,7 @@ function setCaretPosition() {
   }
   // caretTracker = { start: caretPosition, end: caretPosition };
   inputMachine_state = STATE_READY; // and that should be a wrap, folks.
-  console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
+  //console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
   if (eventStack.length > 0) {
     console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
     beforeInputListener(eventStack.shift());
@@ -279,7 +279,7 @@ function setCaretPosition() {
 
 function countBackwardsFrom(node, char_count) {
   for (var current = node; current; current = current.previousSibling) {
-    console.log(`countBackwardsFrom, looking at `, current);
+    //console.log(`countBackwardsFrom, looking at `, current);
     char_count += current.textContent.length;
     if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
       char_count -= parseInt(current.dataset.completionlen);
@@ -465,7 +465,7 @@ function beforeInputListener(event) {
         , start: start
         , end: end
       };
-    console.log(JSON.stringify(packaged));
+    //console.log(JSON.stringify(packaged));
     inputMachine_state = STATE_AWAITING_ELM;
     app.ports.awesomeBarInput.send(packaged);
   }
@@ -563,7 +563,7 @@ app.ports.shiftCaret.subscribe((p) => {
   }
   // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
   inputMachine_state = STATE_AWAITING_DOM;
-  console.log(`Elm says: caret position should be set to ${p}`);
+  //console.log(`Elm says: caret position should be set to ${p}`);
   awaiting_timeout_id =
     setTimeout(() =>
       { awaiting_timeout_id = -1;

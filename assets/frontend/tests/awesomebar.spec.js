@@ -1,5 +1,5 @@
 const {suite} = require('selenium-webdriver/testing');
-const {By, Builder, Browser, until} = require('selenium-webdriver');
+const {By, Builder, Key, Browser, until} = require('selenium-webdriver');
 const assert = require("assert");
 const firefox = require('selenium-webdriver/firefox');
 const LogInspector = require('selenium-webdriver/bidi/logInspector');
@@ -139,6 +139,29 @@ suite(function(env) {
       driver,
       (e) => sendKeys(e, "yo! "),
       "yo! "
+    );
+  });
+
+  it("completes special words whin Tab is pressed", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      async function(e) {
+        await sendKeys(e, "tomor");
+        await sendKeys(e, Key.TAB);
+      },
+      "tomorrow"
+    );
+  });
+
+  it("locates the cursor correctly after a Tab completion", async function() {
+    await checkAwesomebarMessage(
+      driver,
+      async function(e) {
+        await sendKeys(e, "tomor");
+        await sendKeys(e, Key.TAB);
+        await sendKeys(e, "x");
+      },
+      "tomorrowx"
     );
   });
 }, { browsers: ['firefox'] });
