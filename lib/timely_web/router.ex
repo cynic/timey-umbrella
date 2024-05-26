@@ -57,9 +57,10 @@ defmodule TimelyWeb.Router do
     post "/users/log_in", UserSessionController, :create
   end
 
-  scope "/", TimelyWeb do
+  scope "/api", TimelyWeb do
     pipe_through [:api, :require_authenticated_user]
-    resources "/checklist_items", ChecklistItemController, except: [:new, :edit]
+    resources "/tasks", TaskJSON, except: [:new, :edit]
+    resources "/comments", CommentJSON, except: [:new, :edit]
   end
 
   scope "/", TimelyWeb do

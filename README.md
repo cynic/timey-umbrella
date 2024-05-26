@@ -1,5 +1,11 @@
 # Development
 
+## Once-off / setup
+
+1. `mix ecto.reset`
+
+## Ongoing
+
 Run `mix phx.server`.  Elm will be compiled to JS when it can be.
 
 Adding a new data structure on the DB side?  Use `mix phx.gen.context`; see [Phx.Mix.Gen](https://hexdocs.pm/phoenix/1.7.11/Mix.Tasks.Phx.Gen.html).  Examples:

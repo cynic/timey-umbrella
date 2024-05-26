@@ -17,4 +17,34 @@ defmodule Timely.DataFixtures do
 
     checklist_item
   end
+
+  @doc """
+  Generate a task.
+  """
+  def task_fixture(attrs \\ %{}) do
+    {:ok, task} =
+      attrs
+      |> Enum.into(%{
+        status: :active,
+        text: "some text"
+      })
+      |> Timely.Data.create_task()
+
+    task
+  end
+
+  @doc """
+  Generate a comment.
+  """
+  def comment_fixture(attrs \\ %{}) do
+    {:ok, comment} =
+      attrs
+      |> Enum.into(%{
+        comment_reason: :justify_ignored,
+        text: "some text"
+      })
+      |> Timely.Data.create_comment()
+
+    comment
+  end
 end
