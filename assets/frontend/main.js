@@ -206,16 +206,26 @@ document.addEventListener("selectionchange", (e) => {
 const specialKeys = new Set([
   "Tab", "Enter", "Escape", "ArrowDown", "ArrowUp"
 ]);
-document.addEventListener("keydown", (e) => {
+
+function keyDownListener(e) {
   if (document.activeElement.id !== "awesomebar") {
     return true;
   }
   if (specialKeys.has(e.key)) {
     e.preventDefault();
     e.stopPropagation();
+    if (inputMachine_state !== STATE_READY) {
+      console.log(`keyDownListener: inputMachine_state is ${inputMachine_state}; ${e.key} pressed; stacking it.`);
+      eventStack.push(() => keyDownListener(e));
+      return;
+    }
+    console.log(`keyDownListener: handling ${e.key} keydown.`);
+    inputMachine_state = STATE_AWAITING_ELM;
     app.ports.sendSpecial.send(e.key);
   }
-});
+}
+
+document.addEventListener("keydown", keyDownListener);
 
 function userTextLength() {
   var char_count = 0;
@@ -272,7 +282,7 @@ function setCaretPosition() {
   //console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
   if (eventStack.length > 0) {
     console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
-    beforeInputListener(eventStack.shift());
+    eventStack.shift()();
   }
 
 }
@@ -414,9 +424,10 @@ function beforeInputListener(event) {
   }
   if (inputMachine_state !== STATE_READY) {
     console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event (≈'${event.data}') to stack.`);
-    eventStack.push(event);
+    eventStack.push(() => beforeInputListener(event));
     return;
   }
+  console.log(`beforeInputListener: handling event (≈'${event.data}')`);
   // console.log(event);
   if (event.inputType === "insertReplacementText") {
     const replacement = event.dataTransfer.getData("text");
@@ -555,6 +566,14 @@ function initializeBar() {
 
 app.ports.displayAwesomeBar.subscribe(initializeBar);
 app.ports.hideAwesomeBar.subscribe(goodbyeBar);
+app.ports.noActionPerformed.subscribe(() => {
+  if (inputMachine_state === STATE_AWAITING_ELM) {
+    console.log("No action necessary, resetting inputMachine_state to STATE_READY.");
+    inputMachine_state = STATE_READY;
+  } else {
+    console.log(`inputMachine_state is too late to stop; how did we get here? (value = {inputMachine_state}).`);
+  }
+});
 
 app.ports.shiftCaret.subscribe((p) => {
   if (inputMachine_state !== STATE_AWAITING_ELM) {

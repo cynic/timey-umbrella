@@ -229,67 +229,75 @@ updateSetString s i x model =
   )
 
 -- UPDATE
+handleAwesomeBarMsg : AwesomeBarMsg -> AwesomeBarState -> Model -> (Model, Cmd Msg)
+handleAwesomeBarMsg abmsg ab model =
+  case abmsg of
+    ListenerRemoved ->
+      ({ model | mode = Waiting }, Cmd.none)
+    Key Escape ->
+      (model, Ports.hideAwesomeBar ())
+    Key Tab ->
+      -- Plausibly, this is means "complete the current token".
+      ab.parse
+      |> List.filterMap
+          (\(_, completion, {offset, extent} as ofs) ->
+            Maybe.andThen
+              (\completion_ ->
+                if ab.i |> isWithinOffset offset extent then
+                  Just (completion_, ofs)
+                else
+                  Nothing
+              )
+              completion
+          )
+      |> List.head
+      |> Maybe.map
+          (\(completion, {offset, extent}) ->
+            let
+              s = String.left (offset + extent) ab.s ++ completion ++ String.dropLeft (offset + extent) ab.s
+              i = offset + extent + String.length completion
+            in
+              model |> updateSetString s i ab
+          )
+      |> Maybe.withDefault (model, Ports.noActionPerformed ())
+    Key Enter ->
+      ( { model
+        | mode = Waiting
+        }
+      , ClientServer.createChecklistItem ab.s
+      )
+    Key ArrowDown ->
+      (model, Ports.noActionPerformed ())
+    Key ArrowUp ->
+      (model, Ports.noActionPerformed ())
+    Key NonSpecial ->
+      -- Hmmm, this is a catch-all.  Must be careful here; how did such
+      -- a key ever get reported to Elm??
+      (model, Ports.noActionPerformed ())
+    CaretMoved i ->
+      ( { model
+        | mode = AwesomeBar { ab | i = i }
+        }
+      -- This is from JS to us; there was no "input", in the sense
+      -- of the user typing something or invoking a special key
+      , Cmd.none
+      )
+    SetString s i ->
+      model |> updateSetString s i ab
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-  NoOp ->
-    (model, Cmd.none)
   Tick time ->
     ({ model | nowish = time }, Cmd.none)
-  SwitchMode (AwesomeBar x) ->
-    ({ model | mode = AwesomeBar x }, Ports.displayAwesomeBar ())
+  SwitchMode (AwesomeBar initial) ->
+    ({ model | mode = AwesomeBar initial }, Ports.displayAwesomeBar ())
   SwitchMode Waiting ->
     ({ model | mode = Waiting }, Cmd.none)
   AB abmsg ->
     case model.mode of
-      AwesomeBar x ->
-        case abmsg of
-          ListenerRemoved ->
-            ({ model | mode = Waiting }, Cmd.none)
-          Key Escape ->
-            (model, Ports.hideAwesomeBar ())
-          Key Tab ->
-            -- Plausibly, this is means "complete the current token".
-            x.parse
-            |> List.filterMap
-                (\(_, completion, {offset, extent} as ofs) ->
-                  Maybe.andThen
-                    (\completion_ ->
-                      if x.i |> isWithinOffset offset extent then
-                        Just (completion_, ofs)
-                      else
-                        Nothing
-                    )
-                    completion
-                )
-            |> List.head
-            |> Maybe.map
-                (\(completion, {offset, extent}) ->
-                  let
-                    s = String.left (offset + extent) x.s ++ completion ++ String.dropLeft (offset + extent) x.s
-                    i = offset + extent + String.length completion
-                  in
-                    model |> updateSetString s i x
-                )
-            |> Maybe.withDefault (model, Cmd.none)
-          Key Enter ->
-            ( { model
-              | mode = Waiting
-              }
-            , ClientServer.createChecklistItem x.s
-            )
-          Key ArrowDown ->
-            (model, Cmd.none)
-          Key ArrowUp ->
-            (model, Cmd.none)
-          CaretMoved i ->
-            ( { model
-              | mode = AwesomeBar { x | i = i }
-              }
-            , Cmd.none
-            )
-          SetString s i ->
-            model |> updateSetString s i x
+      AwesomeBar ab ->
+        handleAwesomeBarMsg abmsg ab model
       Waiting ->
         (model, Cmd.none)
   GetZone zone ->
@@ -318,6 +326,20 @@ update msg model =
       Err e ->
         Debug.log "from server via GotChecklistItem, weirdness…" e
         |> \_ -> ( model, Cmd.none )
+  NotAllowed CannotDeleteNothing ->
+    (model, Ports.noActionPerformed ())
+  NotAllowed (InputTypeNotSupported inputType) ->
+    Debug.log "Input type was not supported" inputType
+    |> \_ -> (model, Ports.noActionPerformed ())
+  NotAllowed AwesomeBarNotActivated ->
+    (model, Cmd.none)
+  NotAllowed CaretPositionUnchanged ->
+    (model, Cmd.none)
+  NotAllowed (InvalidJsonValueReceived err) ->
+    Debug.log "Invalid JSON value received" err
+    -- the noActionPerformed is a safety-reset; how did I get into this
+    -- weird state?  Who's sending such JSON into the Elm side?
+    |> \_ -> (model, Ports.noActionPerformed ())
 
 -- VIEW
 
@@ -378,7 +400,7 @@ decodeInput model =
         (\inputType data start end ->
           case classifyInput inputType data of
             Disallow ->
-              NoOp
+              NotAllowed (InputTypeNotSupported inputType)
             InsertText ->
               let
                 added = {-Debug.log "Chars added" <|-} String.length data
@@ -388,7 +410,7 @@ decodeInput model =
                 AB (SetString (left ++ data ++ right) (start + added))
             DeleteBackwards ->
               if start == 0 && end == start then
-                NoOp
+                NotAllowed CannotDeleteNothing
               else if start == end then
                 AB (SetString (String.left (start - 1) state.s ++ String.dropLeft end state.s) (start - 1))
               else
@@ -418,8 +440,12 @@ decodeSpecialKey key =
       AB <| Key Tab
     "Enter" ->
       AB <| Key Enter
+    "ArrowDown" ->
+      AB <| Key ArrowDown
+    "ArrowUp" ->
+      AB <| Key ArrowUp
     _ ->
-      NoOp
+      AB <| Key NonSpecial
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -431,7 +457,7 @@ subscriptions model =
           |> D.map
             (\key ->
               if key == " " then SwitchMode (AwesomeBar { s = "", i = 0, parse = [] })
-              else NoOp
+              else NotAllowed AwesomeBarNotActivated
             )
           )
         , Time.every 60000 Tick
@@ -439,7 +465,7 @@ subscriptions model =
     AwesomeBar state ->
       Sub.batch
         [ Ports.awesomeBarInput
-            (D.decodeValue (decodeInput model) >> Result.withDefault NoOp)
+            (D.decodeValue (decodeInput model) >> Result.withDefault (NotAllowed AwesomeBarNotActivated))
         , Ports.listenerRemoved (\_ -> AB ListenerRemoved)
         , Ports.sendSpecial decodeSpecialKey
         , Ports.caretMoved
@@ -448,11 +474,15 @@ subscriptions model =
               |> Result.map
                 (\i ->
                   if i == state.i then
-                    NoOp
+                    NotAllowed CaretPositionUnchanged
                   else
                     (AB <| CaretMoved i)
                 )
-              |> Result.withDefault NoOp
+              |> (\result ->
+                case result of
+                  Ok x -> x
+                  Err e -> NotAllowed (InvalidJsonValueReceived <| D.errorToString e)
+                )
             )
         , Time.every 60000 Tick
         ]

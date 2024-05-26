@@ -31,7 +31,7 @@ let checkAwesomebarMessage =
 
     await send(awesomebar);
     awesomebar = await driver.findElement(By.id('awesomebar'));
-    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${expected.length},}`)));
+    await driver.wait(until.elementTextMatches(awesomebar, new RegExp(`.{${expected.length},}`)), 1500);
     let actual = await awesomebar.getText()
     assert.strictEqual(actual, expected);
     return new Promise((resolve) => { assert.ok(true); resolve(); });  };

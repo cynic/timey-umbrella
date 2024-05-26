@@ -7,6 +7,9 @@ port displayAwesomeBar : () -> Cmd msg
 port hideAwesomeBar : () -> Cmd msg
 -- Tell JS to move the caret to the correct position.
 port shiftCaret : Int -> Cmd msg
+-- Tell JS that there is no action to take; next input can be processed.
+port noActionPerformed : () -> Cmd msg
+
 -- Tell Elm that there's awesomebar input.
 port awesomeBarInput : (E.Value -> msg) -> Sub msg
 -- Tell Elm that the listener is removed, so the element can go too.

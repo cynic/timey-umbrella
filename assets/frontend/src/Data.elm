@@ -117,17 +117,25 @@ type ABSpecialKey
   | Enter
   | ArrowDown
   | ArrowUp
+  | NonSpecial
 
-type ABMsg
+type AwesomeBarMsg
   = SetString String Int
   | ListenerRemoved
   | Key ABSpecialKey
   | CaretMoved Int
 
+type DisallowedReason
+  = CannotDeleteNothing
+  | InputTypeNotSupported String
+  | AwesomeBarNotActivated
+  | CaretPositionUnchanged
+  | InvalidJsonValueReceived String
+
 type Msg
-  = NoOp
-  | SwitchMode Mode
-  | AB ABMsg
+  = SwitchMode Mode
+  | AB AwesomeBarMsg
+  | NotAllowed DisallowedReason
   | Tick Time.Posix
   | GetZone Time.Zone
   | GotChecklistItems (Result Http.Error (List ChecklistItem))
