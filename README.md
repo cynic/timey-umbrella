@@ -1,8 +1,57 @@
+# Development
+
+Run `mix phx.server`.  Elm will be compiled to JS when it can be.
+
+Adding a new data structure on the DB side?  Use `mix phx.gen.context`; see [Phx.Mix.Gen](https://hexdocs.pm/phoenix/1.7.11/Mix.Tasks.Phx.Gen.html).  Examples:
+
+- `mix phx.gen.context Data Task tasks text:string status:enum:active:complete:ignored`
+
 # Testing
 
 Within `assets/frontend`, run:
 - `mocha tests/awesomebar.spec.js`
 - `npx elm-test`
+
+# Database
+
+```
+//// https://dbdiagram.io/d
+
+Table timely.task {
+  id int [pk]
+  // within text, we can have:
+  // - description
+  // - duration
+  // - when
+  text string
+  status timely.task_status
+  created_at datetime
+}
+
+Table timely.comments {
+  id int [pk]
+  task_id int
+  text string
+  created_at datetime
+  comment_reason timely.comment_reason
+}
+
+// Creating references
+// You can also define relaionship separately
+// > many-to-one; < one-to-many; - one-to-one; <> many-to-many
+Ref: timely.task.id < timely.comments.task_id
+
+Enum timely.comment_reason {
+  justify_ignored
+  more_info
+}
+
+Enum timely.task_status {
+  active
+  complete
+  ignored
+}
+```
 
 # Inputs handled
 
