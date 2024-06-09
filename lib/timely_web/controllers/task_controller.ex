@@ -12,6 +12,10 @@ defmodule TimelyWeb.TaskController do
   end
 
   def create(conn, %{"task" => task_params}) do
+    # get the user id from the conn
+    user_id = conn.assigns.current_user.id
+    # add the user id to the task params
+    task_params = Map.put(task_params, "user_id", user_id)
     with {:ok, %Task{} = task} <- Data.create_task(task_params) do
       conn
       |> put_status(:created)

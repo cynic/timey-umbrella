@@ -12,6 +12,11 @@ type alias Date =
   , weekday : Time.Weekday
   }
 
+type alias SimpleTime =
+  { hour : Int
+  , minute : Int
+  }
+
 -- type alias RoughInterval =
 --   (Int, Int) -- e.g. roughly every 5-8 days/minutes/etc
 
@@ -52,16 +57,18 @@ type alias Date =
 --   {
 --   }
 
-type SmallDuration
+type Duration
   = Minutes Int
   | Hours Int Int
+  | Days Int
+  | Weeks Int
 
 -- AwesomeBar start
 type Token
   = Today
   | Tomorrow
   | Description
-  | Duration SmallDuration
+  | Duration Duration
   -- | AcceptLiterally
   -- | Cursor
   -- | AfterDays Int
@@ -78,29 +85,40 @@ type alias AwesomeBarState =
   }
 -- AwesomeBar end
 
-type LongerDurationUnit
-  = Week
-  | Month
-  | Quarter
+-- type LongerDurationUnit
+--   = Week
+--   | Month
+--   | Quarter
 
-type WhenInDuration a
-  = End
-  | Start
+type WhenInInterval a
+  = End Int -- subtraction, max. 10?
+  | Start Int -- addition, max. 10?
   | On (List a)
 
-type BigDuration
-  = Days Int -- after how many days. 0 = today, 1 = tomorrow, etc.
-  | Weekdays (WhenInDuration Time.Weekday)
-  | Workdays (WhenInDuration Time.Weekday)
-  | Weekends (WhenInDuration Time.Weekday)
-  | Weeks (WhenInDuration Time.Weekday)
-  | Months (WhenInDuration Int) -- days of month.  EXCLUDE 28-31??
-  | Years (WhenInDuration (Time.Month, Int)) -- months, days of month
+type WeekendDay
+  = Saturday
+  | Sunday
+
+type RepetitionUnits
+  = DaysPassed -- after how many days. 0 = today, 1 = tomorrow, etc.
+  -- | OnDays (List Time.Weekday)
+  | Workdays
+  | Weekends (List WeekendDay)
+  | WeeksPassed (List Time.Weekday)
+  | MonthsPassed (WhenInInterval Int) -- days of month.  EXCLUDE 28-31??  Or cap it to the closest large one?
+  | YearsPassed (List (Time.Month, Int)) -- months, days of month
+
+type PlusInterval
+  = PlusDays
+  | PlusWorkdays
+  | PlusWeeks -- i.e. 7 days
+  | PlusMonths -- i.e. plus the number of days _in the month examined_
+  | PlusYears
 
 type Recurrence
-  = LastCompletedDatePlus BigDuration
-  | Every Int BigDuration -- The Int is for the recurrence, e.g. every 2 [unit], every 1 [unit], etc
-  | Once (WhenInDuration (Time.Month, Int)) -- month & day, exactly
+  = LastCompletedDate PlusInterval Int
+  | Every Int RepetitionUnits -- The Int is for the recurrence, e.g. every 2 [unit], every 1 [unit], etc
+  | OnceOnly
 
 type alias When =
   { anchor : Date
@@ -138,10 +156,12 @@ type Msg
   | NotAllowed DisallowedReason
   | Tick Time.Posix
   | GetZone Time.Zone
-  | GotChecklistItems (Result Http.Error (List ChecklistItem))
-  | GotChecklistItem (Result Http.Error ChecklistItem)
-  | DeleteChecklistItem Int
-  | PerformChecklistDelete Int -- do it on the client-side, once the server has agreed.
+  | GotTasks (Result Http.Error (List Task))
+  | GotTask (Result Http.Error Task)
+  | DeleteTask Int
+  | PerformTaskDelete Int -- do it on the client-side, once the server has agreed.
+  | CompleteTask Int
+  | ServerDone String
 
 -- type alias Todo =
 --   { s : String
@@ -153,18 +173,148 @@ type UIStatus -- for ops that must first be verified by the server
   = NothingPending
   | DeletionRequested
 
-type alias ChecklistItem =
+-- type alias ActiveTask =
+--   { id : Int
+--   , s : String
+--   , created : Date
+--   , pending : UIStatus
+--   , status : TaskStatus
+--   }
+
+type TaskAction -- possible actions that can be done.
+  = Created String -- the type created, /ab initio/
+  | SpawnedFrom Int String -- the spawner-ID and the type created
+  | TransitionedFrom Int String -- the old-ID and the type created
+  | Bought
+  --- for milestones
+  | Achieved
+  --- for milestones. Reason and new date.
+  | Delayed String Date
+  --- for practice. Logging, optionally, what was done.
+  | PracticeDone (Maybe String)
+  --- for Someday, Todo, Supervision, and Routine
+  | Done
+  --- for CheckBack
+  | Okay
+  --- for Todo and Supervision-Task and CheckBack
+  | PushedOffBy Duration
+  --- for Todo and Supervision-Task
+  | Ignore String -- why
+  --- for CheckBack, when sent reminder and now waiting for response
+  | WaitingForResponse
+  --- for Event
+  | RescheduleTo Date SimpleTime
+  --- for Event.  Logging, optionally, what was done.
+  | Happened (Maybe String)
+  | Transition String String -- from /type/, to /type/
+
+type alias ActionHistory =
+  List
+    { action : TaskAction
+    , date : Date
+    }
+
+-- the different kinds of tasks.  I'm pretty sure I'm missing some of the different 'kinds' of tasks, and
+-- naming is hard!  So I'm just going to go with BASIC-style naming, leaving room for other types in-between
+-- the numbers.  Old habits die hard, I guess.
+type Task -- all have an id
+  = ArchivedItem Task20 -- maybe call this the graveyard!
+  | ShoppingListItem Task20
+  | Idea Task60
+  | Milestone Task80
+  | Practice Task100
+  | Someday Task120
+  | Todo Task140
+  | SupervisionTask Task160
+  | Routine Task180
+  | CheckBack Task200
+  | Event Task220
+
+type alias Task20 = -- archived item
   { id : Int
-  , s : String
+  , description : String
+  , life : ActionHistory
+  }
+
+-- type alias Task40 = Task20
+
+type alias Task60 = -- Idea
+  { id : Int
+  , description : String
   , created : Date
-  , pending : UIStatus
+  , life : ActionHistory
+  }
+
+type alias Task80 = -- Milestone
+  { id : Int
+  , description : String
+  , deadline : Date
+  , life : ActionHistory
+  }
+
+type alias Task100 = -- Practice
+  { id : Int
+  , description : String
+  , estimate : Duration
+  , life : ActionHistory
+  }
+
+type alias Task120 = -- Someday
+  { id : Int
+  , description : String
+  , created : Date
+  , estimate : Duration
+  , life : ActionHistory
+  }
+
+type alias Task140 = -- \Todo
+  { id : Int
+  , description : String
+  , created : Date
+  , estimate : Maybe Duration
+  , deadline : Date
+  , life : ActionHistory
+  }
+
+type alias Task160 = -- Supervision-Task
+  { id : Int
+  , description : String
+  , created : Date
+  , deadline : Date
+  , student : String
+  , life : ActionHistory
+  }
+
+type alias Task180 = -- Routine
+  { id : Int
+  , description : String
+  , estimate : Duration
+  , when : When
+  , life : ActionHistory
+  }
+
+type alias Task200 = -- CheckBack
+  { id : Int
+  , description : String
+  , deadline : Date
+  , life : ActionHistory
+  }
+
+type alias Task220 = -- Event
+  { id : Int
+  , description : String
+  , created : Date
+  , duration : Duration
+  , time : SimpleTime
+  , when : When
+  , life : ActionHistory
   }
 
 type alias Model =
   { mode : Mode
   , nowish : Time.Posix
   , zone : Time.Zone
-  , checklisten : List ChecklistItem
+  , data : List Task
   }
 
 type DateSearchDirection

@@ -14,7 +14,7 @@ defmodule Timely.Data.Task do
   @doc false
   def changeset(task, attrs) do
     task
-    |> cast(attrs, [:text, :status, :user, :comments])
+    |> cast(attrs, [:text, :status])
     |> validate_required([:text, :status])
   end
 end

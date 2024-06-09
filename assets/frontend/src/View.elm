@@ -64,7 +64,7 @@ tokenToView s caretPosition (token, completion, {offset, extent}) =
       (Just completion_, True) ->
         tokenWithCompletion s token completion_ txt
 
-viewDuration : SmallDuration -> Html Msg
+viewDuration : Duration -> Html Msg
 viewDuration duration =
   span
     [ class "duration" ]
@@ -87,44 +87,54 @@ viewDuration duration =
           text <| String.fromInt h ++ "h"
         Hours h m ->
           text <| String.fromInt h ++ "h" ++ String.fromInt m ++ "m"
+        Days d ->
+          if d == 1 then
+            text "1 day"
+          else
+            text <| String.fromInt d ++ " days"
+        Weeks w ->
+          if w == 1 then
+            text "1 week"
+          else
+            text <| String.fromInt w ++ " weeks"
     ]
 
 viewChecklist : Model -> Html Msg
 viewChecklist model =
   ol
     [ class "checklist" ]    
-    ( List.sortBy (\{id} -> id) model.checklisten
-    |> List.map
-      (\{ s, created, id } ->
-        li
-          [ class "checklist-item" ]
-          [ button
-              [ onClick <| DeleteChecklistItem id
-              , class "skeu-convex capsule-left"
-              , title "Push off to another day…"
-              ]
-              [ text "⌛"
-              ]
-          , span
-              [ class "description skeu-convex"
-              , title s
-              ]
-              [ text s ]
-          -- , span
-          --     [ class "created" ]
-          --     [ text <| "Created " ++ String.fromInt created.year ++ "-" ++ monthToString created.month ++ "-" ++ String.fromInt created.day ]
-          , button
-              [ onClick <| DeleteChecklistItem id
-              , class "skeu-convex"
-              ]
-              [ text "✔️" ]
-          , button
-              [ onClick <| DeleteChecklistItem id
-              , class "skeu-convex capsule-right"
-              ]
-              [ text "🗑" ]
-          ]
-      )
+    ( List.map
+      (\task -> div [] [ text "task…" ])
+      model.data
+        -- li
+        --   [ class "checklist-item" ]
+        --   [ button
+        --       [ onClick <| DeleteTask id
+        --       , class "skeu-convex capsule-left"
+        --       , title "Push off to another day…"
+        --       ]
+        --       [ text "⌛"
+        --       ]
+        --   , span
+        --       [ class "description skeu-convex"
+        --       , title s
+        --       ]
+        --       [ text s ]
+        --   -- , span
+        --   --     [ class "created" ]
+        --   --     [ text <| "Created " ++ String.fromInt created.year ++ "-" ++ monthToString created.month ++ "-" ++ String.fromInt created.day ]
+        --   , button
+        --       [ onClick <| DeleteTask id
+        --       , class "skeu-convex"
+        --       ]
+        --       [ text "✔️" ]
+        --   , button
+        --       [ onClick <| DeleteTask id
+        --       , class "skeu-convex capsule-right"
+        --       ]
+        --       [ text "🗑" ]
+        --   ]
+      -- )
     )
 
 viewCalendar : (Date -> Bool) -> Date -> Int -> Html Msg

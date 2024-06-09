@@ -12,10 +12,14 @@ defmodule TimelyWeb.CommentController do
   end
 
   def create(conn, %{"comment" => comment_params}) do
+    # get the task id from the path
+    task_id = conn.params["task_id"]
+    # add the task id to the comment params
+    comment_params = Map.put(comment_params, "task_id", task_id)
     with {:ok, %Comment{} = comment} <- Data.create_comment(comment_params) do
       conn
       |> put_status(:created)
-      |> put_resp_header("location", ~p"/api/comments/#{comment}")
+      |> put_resp_header("location", ~p"/api/tasks/#{task_id}/comments/#{comment}")
       |> render(:show, comment: comment)
     end
   end

@@ -59,8 +59,9 @@ defmodule TimelyWeb.Router do
 
   scope "/api", TimelyWeb do
     pipe_through [:api, :require_authenticated_user]
-    resources "/tasks", TaskJSON, except: [:new, :edit]
-    resources "/comments", CommentJSON, except: [:new, :edit]
+    resources "/tasks", TaskController, except: [:new, :edit] do
+      resources "/comments", CommentController, except: [:new, :edit]
+    end
   end
 
   scope "/", TimelyWeb do

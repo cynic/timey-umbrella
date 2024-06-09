@@ -1,5 +1,4 @@
 defmodule TimelyWeb.TaskJSON do
-  use TimelyWeb, :controller
   alias Timely.Data.Task
 
   @doc """
@@ -20,7 +19,8 @@ defmodule TimelyWeb.TaskJSON do
     %{
       id: task.id,
       text: task.text,
-      status: task.status
+      status: task.status,
+      created: DateTime.to_unix(task.inserted_at, :millisecond)
     }
   end
 end

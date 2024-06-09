@@ -3,9 +3,9 @@ defmodule Timely.Repo.Migrations.CreateComments do
 
   def change do
     create table(:comments) do
-      add :text, :string
-      add :comment_reason, :string
-      add :task_id, references(:tasks, on_delete: :delete_all)
+      add :text, :string, null: false
+      add :comment_reason, :string, null: false
+      add :task_id, references(:tasks, on_delete: :delete_all), null: false
 
       timestamps(type: :utc_datetime)
     end

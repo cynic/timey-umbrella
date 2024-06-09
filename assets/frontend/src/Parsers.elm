@@ -46,7 +46,7 @@ intParser (min, max) =
     )
   )
 
-x_dot_y_hParser : Int -> Parser (SmallDuration, Maybe String)
+x_dot_y_hParser : Int -> Parser (Duration, Maybe String)
 x_dot_y_hParser initial =
   -- syntax: 2.5h , 2.25h, 2.75h
   Parser.succeed identity
@@ -66,7 +66,7 @@ x_dot_y_hParser initial =
       ]
   )
 
-x_fraction_hParser : Int -> Parser (SmallDuration, Maybe String)
+x_fraction_hParser : Int -> Parser (Duration, Maybe String)
 x_fraction_hParser initial =
   -- syntax: 2.5h , 2.25h, 2.75h
   Parser.succeed identity
@@ -87,7 +87,7 @@ x_fraction_hParser initial =
       ]
   )
 
-x_hmParser : Int -> Parser (SmallDuration, Maybe String)
+x_hmParser : Int -> Parser (Duration, Maybe String)
 x_hmParser initial =
   -- syntax: 18m, 1h, etc
   -- syntax: 2h30m 2h10m, etc

@@ -4,7 +4,7 @@ defmodule Timely.DataTest do
   alias Timely.Data
 
   describe "checklist_items" do
-    alias Timely.Data.ChecklistItem
+    alias Timely.Data.Task
 
     import Timely.DataFixtures
 
@@ -23,7 +23,7 @@ defmodule Timely.DataTest do
     test "create_checklist_item/1 with valid data creates a checklist_item" do
       valid_attrs = %{description: "some description"}
 
-      assert {:ok, %ChecklistItem{} = checklist_item} = Data.create_checklist_item(valid_attrs)
+      assert {:ok, %Task{} = checklist_item} = Data.create_checklist_item(valid_attrs)
       assert checklist_item.description == "some description"
     end
 
@@ -35,7 +35,7 @@ defmodule Timely.DataTest do
       checklist_item = checklist_item_fixture()
       update_attrs = %{description: "some updated description"}
 
-      assert {:ok, %ChecklistItem{} = checklist_item} = Data.update_checklist_item(checklist_item, update_attrs)
+      assert {:ok, %Task{} = checklist_item} = Data.update_checklist_item(checklist_item, update_attrs)
       assert checklist_item.description == "some updated description"
     end
 
@@ -47,7 +47,7 @@ defmodule Timely.DataTest do
 
     test "delete_checklist_item/1 deletes the checklist_item" do
       checklist_item = checklist_item_fixture()
-      assert {:ok, %ChecklistItem{}} = Data.delete_checklist_item(checklist_item)
+      assert {:ok, %Task{}} = Data.delete_checklist_item(checklist_item)
       assert_raise Ecto.NoResultsError, fn -> Data.get_checklist_item!(checklist_item.id) end
     end
 

@@ -1,5 +1,4 @@
 defmodule TimelyWeb.CommentJSON do
-  use TimelyWeb, :controller
   alias Timely.Data.Comment
 
   @doc """

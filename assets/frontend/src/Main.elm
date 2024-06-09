@@ -26,12 +26,12 @@ init _ =
   ( { mode = Waiting
   , nowish = Time.millisToPosix 0
   , zone = Time.utc -- for now, 'cos I'm lazy
-  , checklisten = []
+  , data = []
   }
   , Cmd.batch
     [ Task.perform GetZone Time.here
     , Task.perform Tick Time.now
-    , ClientServer.getChecklistItems
+    , ClientServer.getTasks
     ]
   )
 
@@ -94,13 +94,13 @@ findFirst list data =
         x ->
           x
 
-smallDurationToMinutes : SmallDuration -> Int
+smallDurationToMinutes : Duration -> Int
 smallDurationToMinutes d =
   case d of
     Minutes m -> m
     Hours h m -> h * 60 + m
 
-findMaxDuration : List (Token, Maybe String, Offset) -> Maybe SmallDuration
+findMaxDuration : List (Token, Maybe String, Offset) -> Maybe Duration
 findMaxDuration list =
   List.foldl (\item state ->
     case item of
@@ -264,7 +264,7 @@ handleAwesomeBarMsg abmsg ab model =
       ( { model
         | mode = Waiting
         }
-      , ClientServer.createChecklistItem ab.s
+      , ClientServer.createTask ab.s
       )
     Key ArrowDown ->
       (model, Ports.noActionPerformed ())
@@ -302,29 +302,34 @@ update msg model =
         (model, Cmd.none)
   GetZone zone ->
     ( { model | zone = zone }, Cmd.none )
-  GotChecklistItems result ->
+  GotTasks result ->
     case result of
       Ok items ->
-        ( { model | checklisten = items }, Cmd.none )
+        ( { model | data = items }, Cmd.none )
       Err e ->
-        Debug.log "from server via GotChecklistItems, weirdness…" e
+        Debug.log "from server via GotTasks, weirdness…" e
         |> \_ -> ( model, Cmd.none )
-  DeleteChecklistItem id_ ->
-    ( { model | checklisten = List.Extra.updateAt id_ (\x -> { x | pending = DeletionRequested }) model.checklisten }
-    , ClientServer.deleteChecklistItem id_
+  DeleteTask id_ ->
+    ( { model | data = List.Extra.updateAt id_ (\x -> { x | pending = DeletionRequested }) model.data }
+    , ClientServer.deleteTask id_
     )
-  PerformChecklistDelete id_ ->
-    ( { model | checklisten = List.filter (\{id} -> id /= id_) model.checklisten }
+  PerformTaskDelete id_ ->
+    ( { model | data = List.filter (\{id} -> id /= id_) model.data }
     , Cmd.none
     )
-  GotChecklistItem result ->
+  CompleteTask id_ ->
+    ( model, Cmd.none )
+    -- ( { model | data = List.Extra.updateIf (\x -> x.id == id_) (\x -> { x | pending = CompletionRequested }) model.data }
+    -- , ClientServer.completeTask id_
+    -- )
+  GotTask result ->
     case result of
       Ok item ->
-        ( { model | checklisten = item :: model.checklisten }
+        ( { model | data = item :: model.data }
         , Cmd.none
         )
       Err e ->
-        Debug.log "from server via GotChecklistItem, weirdness…" e
+        Debug.log "from server via GotTask, weirdness…" e
         |> \_ -> ( model, Cmd.none )
   NotAllowed CannotDeleteNothing ->
     (model, Ports.noActionPerformed ())
