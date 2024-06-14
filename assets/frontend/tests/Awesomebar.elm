@@ -1,4 +1,4 @@
-module Example exposing (..)
+module Awesomebar exposing (..)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
