@@ -334,6 +334,8 @@ recurrenceDecoder =
           D.map2 Every
             (D.field "n" D.int)
             (D.field "specifically" repetitionUnitsDecoder)
+        "once" ->
+          D.succeed OnceOnly
         _ ->
           D.fail ("Invalid recurrence tag '" ++ tag ++ "'")
     )
@@ -470,6 +472,347 @@ taskDecoder =
       _ -> D.fail ("Invalid task tag '" ++ tag ++ "'")
   )
 
+
+---------------------
+ymdToString : Date -> String
+ymdToString date =
+  String.fromInt date.year ++ "/" ++ String.fromInt (Utility.monthToInt date.month) ++ "/" ++ String.fromInt date.day
+
+durationEncoder : Duration -> E.Value
+durationEncoder duration =
+  case duration of
+    Minutes m ->
+      E.string (String.fromInt m ++ " m")
+    Hours h m ->
+      E.string (String.fromInt h ++ " h " ++ String.fromInt m ++ " m")
+    Days d ->
+      E.string (String.fromInt d ++ " d")
+    Weeks w ->
+      E.string (String.fromInt w ++ " w")
+
+timeEncoder : SimpleTime -> E.Value
+timeEncoder time =
+  E.string (String.fromInt time.hour ++ ":" ++ String.fromInt time.minute)
+
+actionEncoder : TaskAction -> E.Value
+actionEncoder act =
+  case act of
+    Created type_ ->
+      E.object
+        [ ( "tag", E.string "created" )
+        , ( "created", E.string type_ )
+        ]
+    SpawnedFrom spawner this ->
+      E.object
+        [ ( "tag", E.string "spawned_from" )
+        , ( "spawner", E.int spawner )
+        , ( "this", E.string this )
+        ]
+    TransitionedFrom old to ->
+      E.object
+        [ ( "tag", E.string "transitioned_from" )
+        , ( "old", E.int old )
+        , ( "to", E.string to )
+        ]
+    Bought ->
+      E.object
+        [ ( "tag", E.string "bought" ) ]
+    Achieved ->
+      E.object
+        [ ( "tag", E.string "achieved" ) ]
+    Delayed reason newDate ->
+      E.object
+        [ ( "tag", E.string "delayed" )
+        , ( "reason", E.string reason )
+        , ( "newDate", E.string (ymdToString newDate) )
+        ]
+    PracticeDone maybeLog ->
+      case maybeLog of
+        Just log ->
+          E.object
+            [ ( "tag", E.string "practice_done" )
+            , ( "log", E.string log )
+            ]
+        Nothing ->
+          E.object
+            [ ( "tag", E.string "practice_done" ) ]
+    Done ->
+      E.object
+        [ ( "tag", E.string "done" ) ]
+    Okay ->
+      E.object
+        [ ( "tag", E.string "okay" ) ]
+    PushedOffBy delay ->
+      E.object
+        [ ( "tag", E.string "pushedOffBy" )
+        , ( "delay", durationEncoder delay )
+        ]
+    Ignore reason ->
+      E.object
+        [ ( "tag", E.string "ignore" )
+        , ( "reason", E.string reason )
+        ]
+    WaitingForResponse ->
+      E.object
+        [ ( "tag", E.string "waitingForResponse" ) ]
+    RescheduleTo newDate newTime ->
+      E.object
+        [ ( "tag", E.string "reschedule" )
+        , ( "newDate", E.string (ymdToString newDate) )
+        , ( "newTime", timeEncoder newTime )
+        ]
+    Happened maybeLog ->
+      case maybeLog of
+        Just log ->
+          E.object
+            [ ( "tag", E.string "happened" )
+            , ( "log", E.string log )
+            ]
+        Nothing ->
+          E.object
+            [ ( "tag", E.string "happened" ) ]
+    Transition from to ->
+      E.object
+        [ ( "tag", E.string "transition" )
+        , ( "from", E.string from )
+        , ( "to", E.string to )
+        ]
+
+encodeActionHistoryItemEncoder : { action : TaskAction, date : Date } -> E.Value
+encodeActionHistoryItemEncoder actionHistoryItem =
+  E.object
+    [ ( "act", actionEncoder actionHistoryItem.action )
+    , ( "dt", E.string (ymdToString actionHistoryItem.date) )
+    ]
+
+weekendDayEncoder : WeekendDay -> E.Value
+weekendDayEncoder day =
+  case day of
+    Saturday ->
+      E.string "sat"
+    Sunday ->
+      E.string "sun"
+
+weekdayEncoder : Time.Weekday -> E.Value
+weekdayEncoder day =
+  case day of
+    Time.Mon ->
+      E.string "mon"
+    Time.Tue ->
+      E.string "tue"
+    Time.Wed ->
+      E.string "wed"
+    Time.Thu ->
+      E.string "thu"
+    Time.Fri ->
+      E.string "fri"
+    Time.Sat ->
+      E.string "sat"
+    Time.Sun ->
+      E.string "sun"
+
+monthIntervalEncoder : WhenInInterval Int -> E.Value
+monthIntervalEncoder when =
+  case when of
+    On days ->
+      E.object
+        [ ( "days", E.list E.int days ) ]
+    Start n ->
+      E.object
+        [ ( "from_start", E.int n ) ]
+    End n ->
+      E.object
+        [ ( "from_end", E.int n ) ]
+
+monthAndDayEncoder : (Time.Month, Int) -> E.Value
+monthAndDayEncoder (mon, day) =
+  E.object
+    [ ( "m", E.int (Utility.monthToInt mon) )
+    , ( "d", E.int day )
+    ]
+
+repetitionUnitsEncoder : RepetitionUnits -> E.Value
+repetitionUnitsEncoder units =
+  case units of
+    DaysPassed ->
+      E.object
+        [ ( "tag", E.string "days" ) ]
+    Workdays ->
+      E.object
+        [ ( "tag", E.string "workdays" ) ]
+    Weekends days ->
+      E.object
+        [ ( "tag", E.string "weekends" )
+        , ( "on", E.list weekendDayEncoder days )
+        ]
+    WeeksPassed days ->
+      E.object
+        [ ( "tag", E.string "weeks" )
+        , ( "on", E.list weekdayEncoder days )
+        ]
+    MonthsPassed interval ->
+      E.object
+        [ ( "tag", E.string "months" )
+        , ( "days", monthIntervalEncoder interval )
+        ]
+    YearsPassed days ->
+      E.object
+        [ ( "tag", E.string "years" )
+        , ( "on", E.list monthAndDayEncoder days )
+        ]
+
+plusIntervalEncoder : PlusInterval -> E.Value
+plusIntervalEncoder interval =
+  case interval of
+    PlusDays ->
+      E.string "days"
+    PlusWorkdays ->
+      E.string "workdays"
+    PlusWeeks ->
+      E.string "weeks"
+    PlusMonths ->
+      E.string "months"
+    PlusYears ->
+      E.string "years"
+
+recurrenceEncoder : Recurrence -> E.Value
+recurrenceEncoder recurrence =
+  case recurrence of
+    LastCompletedDate interval n ->
+      E.object
+        [ ( "tag", E.string "last_completed_date" )
+        , ( "interval", plusIntervalEncoder interval )
+        , ( "n", E.int n )
+        ]
+    Every n specifically ->
+      E.object
+        [ ( "tag", E.string "every" )
+        , ( "n", E.int n )
+        , ( "specifically", repetitionUnitsEncoder specifically )
+        ]
+    OnceOnly ->
+      E.object
+        [ ( "tag", E.string "once" ) ]
+
+whenEncoder : When -> E.Value
+whenEncoder when =
+  E.object
+    [ ( "anchor", E.string (ymdToString when.anchor) )
+    , ( "recurrence", recurrenceEncoder when.recurrence )
+    ]
+
+taskEncoder : Task -> E.Value
+taskEncoder task =
+  case task of
+    ArchivedItem task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "archive" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        ]
+    ShoppingListItem task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "to_buy" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        ]
+    Idea task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "idea" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "created", E.string (ymdToString task_.created) )
+        ]
+    Milestone task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "milestone" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "deadline", E.string (ymdToString task_.deadline) )
+        ]
+    Practice task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "practice" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "estimate", durationEncoder task_.estimate )
+        ]
+    Someday task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "someday" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "created", E.string (ymdToString task_.created) )
+        , ( "estimate", durationEncoder task_.estimate )
+        ]
+    Todo task_ ->
+      case task_.estimate of
+        Just estimate ->
+          E.object
+            [ ( "id", E.int task_.id )
+            , ( "tag", E.string "todo" )
+            , ( "description", E.string task_.description )
+            , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+            , ( "created", E.string (ymdToString task_.created) )
+            , ( "deadline", E.string (ymdToString task_.deadline) )
+            , ( "estimate", durationEncoder estimate )
+            ]
+        Nothing ->
+          E.object
+            [ ( "id", E.int task_.id )
+            , ( "tag", E.string "todo" )
+            , ( "description", E.string task_.description )
+            , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+            , ( "created", E.string (ymdToString task_.created) )
+            , ( "deadline", E.string (ymdToString task_.deadline) )
+            ]
+    SupervisionTask task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "supervision" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "created", E.string (ymdToString task_.created) )
+        , ( "deadline", E.string (ymdToString task_.deadline) )
+        , ( "student", E.string task_.student )
+        ]
+    Routine task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "routine" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "estimate", durationEncoder task_.estimate )
+        , ( "when", whenEncoder task_.when )
+        ]
+    CheckBack task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "checkback" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "deadline", E.string (ymdToString task_.deadline) )
+        ]
+    Event task_ ->
+      E.object
+        [ ( "id", E.int task_.id )
+        , ( "tag", E.string "event" )
+        , ( "description", E.string task_.description )
+        , ( "life", E.list encodeActionHistoryItemEncoder task_.life )
+        , ( "created", E.string (ymdToString task_.created) )
+        , ( "duration", durationEncoder task_.duration )
+        , ( "time", timeEncoder task_.time )
+        , ( "when", whenEncoder task_.when )
+        ]
+
+
+----------------------
 withinDataDecoder : D.Decoder a -> D.Decoder a
 withinDataDecoder decoder =
   D.field "data" decoder

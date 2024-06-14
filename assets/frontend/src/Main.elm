@@ -99,6 +99,8 @@ smallDurationToMinutes d =
   case d of
     Minutes m -> m
     Hours h m -> h * 60 + m
+    Days n -> n * 24 * 60
+    Weeks n -> n * 7 * 24 * 60
 
 findMaxDuration : List (Token, Maybe String, Offset) -> Maybe Duration
 findMaxDuration list =
@@ -310,13 +312,15 @@ update msg model =
         Debug.log "from server via GotTasks, weirdness…" e
         |> \_ -> ( model, Cmd.none )
   DeleteTask id_ ->
-    ( { model | data = List.Extra.updateAt id_ (\x -> { x | pending = DeletionRequested }) model.data }
-    , ClientServer.deleteTask id_
-    )
+    ( model, Cmd.none )
+    -- ( { model | data = List.Extra.updateAt id_ (\x -> { x | pending = DeletionRequested }) model.data }
+    -- , ClientServer.deleteTask id_
+    -- )
   PerformTaskDelete id_ ->
-    ( { model | data = List.filter (\{id} -> id /= id_) model.data }
-    , Cmd.none
-    )
+    ( model, Cmd.none )
+    -- ( { model | data = List.filter (\{id} -> id /= id_) model.data }
+    -- , Cmd.none
+    -- )
   CompleteTask id_ ->
     ( model, Cmd.none )
     -- ( { model | data = List.Extra.updateIf (\x -> x.id == id_) (\x -> { x | pending = CompletionRequested }) model.data }
@@ -345,6 +349,9 @@ update msg model =
     -- the noActionPerformed is a safety-reset; how did I get into this
     -- weird state?  Who's sending such JSON into the Elm side?
     |> \_ -> (model, Ports.noActionPerformed ())
+  ServerDone s ->
+    Debug.log "Server done" s
+    |> \_ -> (model, Cmd.none)
 
 -- VIEW
 
