@@ -92,6 +92,40 @@ bigDurationDecoder =
           D.fail ("Invalid duration format '" ++ durationString ++ "'")
     )
 
+anyDurationDecoder : D.Decoder Duration
+anyDurationDecoder =
+  D.string
+  |> D.andThen
+    (\durationString ->
+      case String.split " " durationString of
+        [h, "h", m, "m"] ->
+          case ( String.toInt h, String.toInt m ) of
+            ( Just h_, Just m_ ) ->
+              D.succeed (Hours h_ m_)
+            ( Nothing, _ ) ->
+              D.fail ("Invalid hour in duration '" ++ durationString ++ "'")
+            ( _, Nothing ) ->
+              D.fail ("Invalid minute in duration '" ++ durationString ++ "'")
+        [h, "h"] ->
+          String.toInt h
+          |> Maybe.map (\h_ -> D.succeed (Hours h_ 0))
+          |> Maybe.withDefault (D.fail ("Invalid number in duration '" ++ durationString ++ "'"))
+        [x, "m"] ->
+          String.toInt x
+          |> Maybe.map (\m -> D.succeed (Minutes m))
+          |> Maybe.withDefault (D.fail ("Invalid number in duration '" ++ durationString ++ "'"))
+        [x, "d"] ->
+          String.toInt x
+          |> Maybe.map (\d -> D.succeed (Days d))
+          |> Maybe.withDefault (D.fail ("Invalid number in duration '" ++ durationString ++ "'"))
+        [x, "w"] ->
+          String.toInt x
+          |> Maybe.map (\w -> D.succeed (Weeks w))
+          |> Maybe.withDefault (D.fail ("Invalid number in duration '" ++ durationString ++ "'"))
+        _ ->
+          D.fail ("Invalid duration format '" ++ durationString ++ "'")
+    )
+
 smallishDurationDecoder : D.Decoder Duration
 smallishDurationDecoder =
   D.string
@@ -117,10 +151,6 @@ smallishDurationDecoder =
         [x, "d"] ->
           String.toInt x
           |> Maybe.map (\d -> D.succeed (Days d))
-          |> Maybe.withDefault (D.fail ("Invalid number in smallish duration '" ++ durationString ++ "'"))
-        [x, "w"] ->
-          String.toInt x
-          |> Maybe.map (\w -> D.succeed (Weeks w))
           |> Maybe.withDefault (D.fail ("Invalid number in smallish duration '" ++ durationString ++ "'"))
         _ ->
           D.fail ("Invalid duration smallish format '" ++ durationString ++ "'")
@@ -192,7 +222,7 @@ actionDecoder =
         "ignore" ->
           D.map Ignore
             (D.field "reason" D.string)
-        "waitngForResponse" ->
+        "waitingForResponse" ->
           D.succeed WaitingForResponse
         "reschedule" ->
           D.map2 RescheduleTo
@@ -371,7 +401,7 @@ decodePractice id desc life =
     (\estimate ->
       Practice <| Task100 id desc estimate life
     )
-    (D.field "estimate" smallishDurationDecoder)
+    (D.field "estimate" smallDurationDecoder)
 
 decodeSomeday : Int -> String -> ActionHistory -> D.Decoder Task
 decodeSomeday id desc life =
@@ -380,7 +410,7 @@ decodeSomeday id desc life =
       Someday <| Task120 id desc created estimate life
     )
     (D.field "created" dateDecoder)
-    (D.field "estimate" smallishDurationDecoder)
+    (D.field "estimate" anyDurationDecoder)
 
 decodeTodo : Int -> String -> ActionHistory -> D.Decoder Task
 decodeTodo id desc life =
