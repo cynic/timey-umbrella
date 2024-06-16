@@ -115,10 +115,26 @@ archivedItemFuzzer =
     Fuzz.string
     (Fuzz.list actionHistoryItemFuzzer)
 
+shoppingListItemFuzzer : Fuzzer Task
+shoppingListItemFuzzer =
+  Fuzz.map3
+    (\id desc life ->
+      ShoppingListItem <| Task20 id desc life
+    )
+    (Fuzz.intAtLeast 0)
+    Fuzz.string
+    (Fuzz.list actionHistoryItemFuzzer)
+
+
 roundtrip_task_tests : Test
 roundtrip_task_tests =
   describe "We can roundtrip"
     [ fuzz archivedItemFuzzer "an archived item" <|
+      \datum ->
+        Expect.equal
+          (Ok datum)
+          (D.decodeString taskDecoder <| E.encode 0 <| taskEncoder datum)
+    , fuzz archivedItemFuzzer "a shopping-list item" <|
       \datum ->
         Expect.equal
           (Ok datum)
