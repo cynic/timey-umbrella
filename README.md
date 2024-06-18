@@ -26,7 +26,7 @@ From root:
 ```
 //// https://dbdiagram.io/d
 
-Table timely.user {
+Table timey.user {
   id int [pk]
   email string
   password string
@@ -34,38 +34,38 @@ Table timely.user {
   confirmed_at datetime
 }
 
-Table timely.task {
+Table timey.task {
   id int [pk]
   // within text, we can have:
   // - description
   // - duration
   // - when
   text string
-  status timely.task_status
+  status timey.task_status
   created_at datetime
   user_id int
 }
 
-Table timely.comments {
+Table timey.comments {
   id int [pk]
   task_id int
   text string
   created_at datetime
-  comment_reason timely.comment_reason
+  comment_reason timey.comment_reason
 }
 
 // Creating references
 // You can also define relaionship separately
 // > many-to-one; < one-to-many; - one-to-one; <> many-to-many
-Ref: timely.task.id < timely.comments.task_id
-Ref: timely.user.id < timely.task.user_id
+Ref: timey.task.id < timey.comments.task_id
+Ref: timey.user.id < timey.task.user_id
 
-Enum timely.comment_reason {
+Enum timey.comment_reason {
   justify_ignored
   more_info
 }
 
-Enum timely.task_status {
+Enum timey.task_status {
   active
   complete
   ignored

@@ -7,5 +7,6 @@
       elixir erlang rebar3
       pgadmin4-desktopmode
       firefox nodePackages.mocha
+      valkey
     ];
 }
