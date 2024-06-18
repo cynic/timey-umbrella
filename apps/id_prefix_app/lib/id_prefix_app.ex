@@ -14,6 +14,16 @@ defmodule IdPrefixApp do
   """
   use Application
 
+  # def child_spec(opts) do
+  #   %{
+  #     id: __MODULE__,
+  #     start: {Supervisor, :start_link, [opts]},
+  #     type: :worker,
+  #     restart: :permanent,
+  #     shutdown: 500
+  #   }
+  # end
+
   @impl true
   def start(_type, _args) do
     children = [

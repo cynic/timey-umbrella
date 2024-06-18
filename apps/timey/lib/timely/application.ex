@@ -17,8 +17,8 @@ defmodule Timey.Application do
       # Start a worker by calling: Timey.Worker.start_link(arg)
       # {Timey.Worker, arg},
       # Start to serve requests, typically the last entry
-      TimeyWeb.Endpoint,
-      IdPrefixApp
+      TimeyWeb.Endpoint
+      # IdPrefixApp
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
