@@ -26,7 +26,8 @@ config :timey, Timey.Endpoint,
   secret_key_base: "ilWaOY79Ez0cO3R8LbxItTUOoe0R7MDvtg1o7950Z1fcfd80jwwUgJSyNl0csncv",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:timey, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:timey, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:timey, ~w(--watch)]},
+    node: ["./build.js", "--watch", cd: Path.expand("../apps/timey/assets/frontend", __DIR__)]
   ]
 
 # ## SSL Support
