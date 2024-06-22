@@ -3,6 +3,7 @@ node_modules
 .elixir_ls
 **/assets/js/main.js
 __pycache__
+timey_old
 
 # Valkey save
 dump.rdb
