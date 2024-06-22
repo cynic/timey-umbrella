@@ -1,8 +1,8 @@
 defmodule Timey.UserRegistrationLive do
   use Timey, :live_view
 
-  alias Timey.Accounts
-  alias Timey.Accounts.User
+  alias SqlDb.Accounts
+  alias SqlDb.Accounts.User
 
   def render(assigns) do
     ~H"""

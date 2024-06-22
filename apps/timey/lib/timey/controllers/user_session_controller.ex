@@ -1,7 +1,7 @@
 defmodule Timey.UserSessionController do
   use Timey, :controller
 
-  alias Timey.Accounts
+  alias SqlDb.Accounts
   alias Timey.UserAuth
 
   def create(conn, %{"_action" => "registered"} = params) do

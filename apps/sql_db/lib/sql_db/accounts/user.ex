@@ -1,4 +1,4 @@
-defmodule Timey.Accounts.User do
+defmodule SqlDb.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -133,7 +133,7 @@ defmodule Timey.Accounts.User do
   If there is no user or the user doesn't have a password, we call
   `Argon2.no_user_verify/0` to avoid timing attacks.
   """
-  def valid_password?(%Timey.Accounts.User{hashed_password: hashed_password}, password)
+  def valid_password?(%SqlDb.Accounts.User{hashed_password: hashed_password}, password)
       when is_binary(hashed_password) and byte_size(password) > 0 do
     Argon2.verify_pass(password, hashed_password)
   end

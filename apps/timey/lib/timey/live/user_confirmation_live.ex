@@ -1,7 +1,7 @@
 defmodule Timey.UserConfirmationLive do
   use Timey, :live_view
 
-  alias Timey.Accounts
+  alias SqlDb.Accounts
 
   def render(%{live_action: :edit} = assigns) do
     ~H"""

@@ -1,7 +1,7 @@
-defmodule Timey.Accounts.UserNotifier do
+defmodule SqlDb.Accounts.UserNotifier do
   import Swoosh.Email
 
-  alias Timey.Mailer
+  alias SqlDb.Mailer
 
   # Delivers the email using the application mailer.
   defp deliver(recipient, subject, body) do

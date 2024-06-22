@@ -1,4 +1,4 @@
-defmodule Timey.Accounts do
+defmodule SqlDb.Accounts do
   @moduledoc """
   The Accounts context.
   """
@@ -6,7 +6,7 @@ defmodule Timey.Accounts do
   import Ecto.Query, warn: false
   alias SqlDb.Repo
 
-  alias Timey.Accounts.{User, UserToken, UserNotifier}
+  alias SqlDb.Accounts.{User, UserToken, UserNotifier}
 
   ## Database getters
 

@@ -1,7 +1,7 @@
 defmodule Timey.UserResetPasswordLive do
   use Timey, :live_view
 
-  alias Timey.Accounts
+  alias SqlDb.Accounts
 
   def render(assigns) do
     ~H"""

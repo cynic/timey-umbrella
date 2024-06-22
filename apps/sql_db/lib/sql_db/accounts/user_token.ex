@@ -1,7 +1,7 @@
-defmodule Timey.Accounts.UserToken do
+defmodule SqlDb.Accounts.UserToken do
   use Ecto.Schema
   import Ecto.Query
-  alias Timey.Accounts.UserToken
+  alias SqlDb.Accounts.UserToken
 
   @hash_algorithm :sha256
   @rand_size 32
@@ -17,7 +17,7 @@ defmodule Timey.Accounts.UserToken do
     field :token, :binary
     field :context, :string
     field :sent_to, :string
-    belongs_to :user, Timey.Accounts.User
+    belongs_to :user, SqlDb.Accounts.User
 
     timestamps(updated_at: false)
   end
