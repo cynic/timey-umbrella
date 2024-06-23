@@ -2,8 +2,10 @@
 
 ## Once-off / setup
 
+From the root of the umbrella project,
+
 1. `mix ecto.reset`
-3. Register with a username/password.  I've got one in the `assets/frontend/awesomebar.spec.js` file, if I recall correctly…
+2. `mix amnesia.create -d Database --disk`
 
 ## Ongoing
 

@@ -4,6 +4,7 @@ node_modules
 **/assets/js/main.js
 __pycache__
 timey_old
+Mnesia.*@*
 
 # Valkey save
 dump.rdb

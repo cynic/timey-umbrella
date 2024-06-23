@@ -1,6 +1,5 @@
 defmodule IdPrefixApp.Base36Generator do
-  require Amnesia
-  require Amnesia.Helper
+  use Amnesia
   require Exquisite
   require Database.PrefixMap
   require Logger

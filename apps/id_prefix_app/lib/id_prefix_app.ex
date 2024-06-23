@@ -2,6 +2,7 @@ defmodule IdPrefixApp do
   @moduledoc """
   Documentation for `IdPrefixApp`.
   """
+  use Amnesia
   require Logger
 
   @doc """
@@ -19,13 +20,6 @@ defmodule IdPrefixApp do
   def start(_type, _args) do
     Logger.info("Starting IdPrefixApp")
     children = [
-      # Start Mnesia
-      {Task, fn ->
-        Amnesia.start()
-        Amnesia.Schema.create([node()])
-        # Database.create()
-      end
-      },
       # Start Redix
       {Redix, {"redis://localhost:6379", [name: :redix]}},
       # {Redix, %{host: "localhost", port: 6379, name: :redix}},
@@ -36,6 +30,12 @@ defmodule IdPrefixApp do
       }
     ]
 
+    Amnesia.start()
+    Amnesia.transaction do
+      Amnesia.Schema.create([node()])
+      Database.PrefixMap.create()
+    end
+
     opts = [strategy: :one_for_one, name: IdPrefixApp.Supervisor]
     Supervisor.start_link(children, opts)
   end
@@ -45,5 +45,16 @@ defmodule IdPrefixApp do
     Amnesia.stop()
     :ok
   end
+
+  # def inspect_macros do
+  #   IO.inspect(quote do
+  #     use Amnesia
+  #     defdatabase Database do
+  #       deftable PrefixMap, [:prefix, :user], type: :set do
+  #         @type t :: %PrefixMap{prefix: String.t(), user: integer()}
+  #       end
+  #     end
+  #   end |> Macro.expand_literals(__ENV__))
+  # end
 
 end
