@@ -32,7 +32,7 @@ defmodule Timey.ConnCase do
   end
 
   setup tags do
-    Timey.DataCase.setup_sandbox(tags)
+    SqlDb.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

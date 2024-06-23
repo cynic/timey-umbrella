@@ -2,15 +2,17 @@ defmodule SqlDb.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
+require Logger
 
   use Application
 
   @impl true
   def start(_type, _args) do
+    Logger.info("Starting SqlDb")
     children = [
       SqlDb.Repo,
       {DNSCluster, query: Application.get_env(:sql_db, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Timey.PubSub},
+      {Phoenix.PubSub, name: SqlDb.PubSub},
       # Start the Finch HTTP client for sending emails
       {Finch, name: SqlDb.Finch}
       # Start a worker by calling: SqlDb.Worker.start_link(arg)

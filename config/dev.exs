@@ -30,6 +30,9 @@ config :timey, Timey.Endpoint,
     node: ["./build.js", "--watch", cd: Path.expand("../apps/timey/assets/frontend", __DIR__)]
   ]
 
+config :id_prefix_app, IdPrefixApp.Base36Generator,
+  code_reloader: true
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed

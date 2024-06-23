@@ -2,6 +2,7 @@ defmodule IdPrefixApp do
   @moduledoc """
   Documentation for `IdPrefixApp`.
   """
+  require Logger
 
   @doc """
   Hello world.
@@ -14,18 +15,9 @@ defmodule IdPrefixApp do
   """
   use Application
 
-  # def child_spec(opts) do
-  #   %{
-  #     id: __MODULE__,
-  #     start: {Supervisor, :start_link, [opts]},
-  #     type: :worker,
-  #     restart: :permanent,
-  #     shutdown: 500
-  #   }
-  # end
-
   @impl true
   def start(_type, _args) do
+    Logger.info("Starting IdPrefixApp")
     children = [
       # Start Mnesia
       {Task, fn ->
@@ -35,11 +27,11 @@ defmodule IdPrefixApp do
       end
       },
       # Start Redix
-      {Redix, name: :redix},
+      {Redix, {"redis://localhost:6379", [name: :redix]}},
+      # {Redix, %{host: "localhost", port: 6379, name: :redix}},
       # Start the queue
-      %{
-        id: IdPrefixApp.Base36Generator,
-        start: {IdPrefixApp.Base36Generator, [[]]},
+      %{id: IdPrefixApp.Base36Generator,
+        start: {IdPrefixApp.Base36Generator, :start_link, [[]]},
         type: :worker
       }
     ]

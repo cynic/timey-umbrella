@@ -3,21 +3,22 @@ defmodule IdPrefixApp.Base36Generator do
   require Amnesia.Helper
   require Exquisite
   require Database.PrefixMap
+  require Logger
 
   alias Database.PrefixMap
 
   def start_link(_args) do
     # Amnesia.Table.create(__MODULE__, [:max], type: :set, disc_copies: [node()])
-    initial_state =
-      case Redix.command(:redix, ~w"GET max") do
-        {:error, _} -> # No maximum stored.  We'll start with 1.
-          initial = int_to_base36(1)
-          Redix.command(:redix, ~w"SET max #{initial}")
-          initial
-        {:ok, max} ->
-          max
-      end
-    {:ok, initial_state}
+    Logger.info("Starting Base36Generator")
+    case Redix.command(:redix, ~w"GET max") do
+      {:ok, nil} -> # No maximum stored.  We'll start with 1.
+        Redix.command!(:redix, ~w"SET max #{int_to_base36(1)}")
+        {:ok, self()}
+      {:ok, _} ->
+        {:ok, self()}
+      x ->
+        x
+    end
   end
 
   def stop() do
@@ -45,20 +46,35 @@ defmodule IdPrefixApp.Base36Generator do
 
   def get_id() do
     case Redix.command(:redix, ~w"SPOP unused-ids") do
-      {:error, _} ->
+      {:ok, nil} ->
         # We don't have any unused IDs.
         max = Redix.command!(:redix, ~w"GET max")
-        Redix.command!(:redix, ~w"INCR max")
-        output = int_to_base36(max)
-        Redix.command!(:redix, ~w"SADD unused-ids #{output}")
+        v = Redix.command!(:redix, ~w"INCR max")
+        Logger.debug("Post-increment: #{v}")
+        {n, _} = Integer.parse(max)
+        Logger.debug("Parsed: #{n}")
+        output = int_to_base36(n)
+        Redix.command!(:redix, ~w"SADD unsure-ids #{output}")
+        Logger.debug("Output stored: #{output}")
         output
       {:ok, value} ->
         value
     end
   end
 
-  def set_used(prefix, userid) do
-    case Redix.command(:redix, ~w"SREM unused-ids #{prefix}") do
+  def prefix_dropped(prefix) do
+    case Redix.command(:redix, ~w"SISMEMBER unsure-ids #{prefix}") do
+      {:ok, "1"} ->
+        Redix.command!(:redix, ~w"SREM unsure-ids #{prefix}")
+        Redix.command!(:redix, ~w"SADD unused-ids #{prefix}")
+      _ ->
+        # It was already removed, and that's fine.
+        :ok
+    end
+  end
+
+  def prefix_used(prefix, userid) do
+    case Redix.command(:redix, ~w"SREM unsure-ids #{prefix}") do
       {:ok, "1"} ->
         Amnesia.transaction do
           %PrefixMap{prefix: prefix, user: userid}

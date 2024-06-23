@@ -34,7 +34,7 @@ config :timey, Timey.Endpoint,
     formats: [html: Timey.ErrorHTML, json: Timey.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Timey.PubSub,
+  pubsub_server: SqlDb.PubSub,
   live_view: [signing_salt: "M1BRa5mV"]
 
 # Configure esbuild (the version is required)
