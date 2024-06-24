@@ -4,10 +4,14 @@
 
 From the root of the umbrella project,
 
-1. `mix ecto.reset`
-2. `mix amnesia.create -d Database --disk`
+1. `npm install`
+2. `mix deps.get`
+3. `mix ecto.reset`
+4. `mix amnesia.create -d Database --disk`
 
 ## Ongoing
+
+Run `valkey-server`.
 
 Run `mix phx.server`.  Elm will be compiled to JS when it can be.
 
