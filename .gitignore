@@ -2,6 +2,7 @@ elm-stuff
 node_modules
 .elixir_ls
 **/assets/js/main.js
+**/assets/js/debug.js
 __pycache__
 timey_old
 Mnesia.*@*

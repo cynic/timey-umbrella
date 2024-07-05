@@ -1,7 +1,5 @@
 import { Elm } from './src/Main.elm';
 
-const $root = document.getElementById("elm-app");
-
 /* For positions within a `contenteditable`, I've used/adapted the following code/resources:
 
 - https://stackoverflow.com/a/41034697
@@ -133,468 +131,478 @@ caretTracker = { start: 0, end: 0 }; // this is SEPARATE from caretPosition.
 // 👆 this is used to tell Elm what JS sees as the caret position.
 // However, after updating the caret position manually, the caretTracker will be
 // updated as well to the manually-set value.
-
-let app = Elm.Main.init({
-  node: $root,
-  flags: null
-});
-
 const caretChangingKeys = new Set([
   "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
 ]);
-document.addEventListener("keyup", (e) => {
-  // When insertions, deletions, pastes, composition, etc happens,
-  // I can rely on Elm to give back the correct caret position, so all is well.
-  // However, when the user moves the caret around with specific keys,
-  // I need to inform Elm about that.
-  if (caretChangingKeys.has(e.key)) {
+
+export function start_elm(flags, setup_channels) {
+  const $root = document.getElementById("elm-app");
+
+  if (!$root) {
+    throw new Error("No #elm-app element found; not continuing.");
+  }
+
+  let app = Elm.Main.init({
+    node: $root,
+    flags: flags
+  });
+
+  setup_channels(app);
+
+  document.addEventListener("keyup", (e) => {
+    // When insertions, deletions, pastes, composition, etc happens,
+    // I can rely on Elm to give back the correct caret position, so all is well.
+    // However, when the user moves the caret around with specific keys,
+    // I need to inform Elm about that.
+    if (caretChangingKeys.has(e.key)) {
+      e.stopPropagation();
+      // console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
+      checkCaretChange();
+      let sel = document.getSelection();
+      let range = sel.getRangeAt(0);
+      if (range.isCollapsed === true) {
+        caretPosition = caretTracker.start;
+        // there is an interesting edge-case here.
+        // If we are moving right ✅
+        // AND we are at the end of a <span> ✅
+        // AND that span has a completion ✅
+        // AND there is a space directly to the right of us ✅
+        // THEN we should actually move the caret one more position to the right of the span (i.e. add 1 to it).
+        // (OR, if Ctrl+ArrowRight is pressed, we should move to the end of the span.)
+        // …and otherwise, everything works out quite normally.
+        // EDGE-CASE STUFF
+        if (e.key === "ArrowRight") {
+          let node = range.endContainer;
+          let ofs = range.endOffset;
+          if (ofs === 0 && node.nodeType === Node.TEXT_NODE && node.textContent.length > 0 && node.textContent.trim() === "") {
+            let prev = node.previousSibling || node.parentNode.previousSibling; // if in a span.
+            if (prev && prev.nodeType === Node.ELEMENT_NODE && prev.tagName === "SPAN" && prev.dataset.completionlen !== undefined) {
+                console.log("Edge case: moving +1 space right from end of span");
+                caretPosition += 1;
+            }
+          }
+        }
+        // END EDGE-CASE STUFF
+        setCaretPosition();
+      }
+    }
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (document.activeElement.id !== "awesomebar") {
+      return true;
+    }
     e.stopPropagation();
-    // console.log(`Keyup: will now check cursor position, ${e.key} pressed.`);
     checkCaretChange();
     let sel = document.getSelection();
     let range = sel.getRangeAt(0);
     if (range.isCollapsed === true) {
       caretPosition = caretTracker.start;
-      // there is an interesting edge-case here.
-      // If we are moving right ✅
-      // AND we are at the end of a <span> ✅
-      // AND that span has a completion ✅
-      // AND there is a space directly to the right of us ✅
-      // THEN we should actually move the caret one more position to the right of the span (i.e. add 1 to it).
-      // (OR, if Ctrl+ArrowRight is pressed, we should move to the end of the span.)
-      // …and otherwise, everything works out quite normally.
-      // EDGE-CASE STUFF
-      if (e.key === "ArrowRight") {
-        let node = range.endContainer;
-        let ofs = range.endOffset;
-        if (ofs === 0 && node.nodeType === Node.TEXT_NODE && node.textContent.length > 0 && node.textContent.trim() === "") {
-          let prev = node.previousSibling || node.parentNode.previousSibling; // if in a span.
-          if (prev && prev.nodeType === Node.ELEMENT_NODE && prev.tagName === "SPAN" && prev.dataset.completionlen !== undefined) {
-              console.log("Edge case: moving +1 space right from end of span");
-              caretPosition += 1;
-          }
-        }
-      }
-      // END EDGE-CASE STUFF
       setCaretPosition();
     }
-  }
-});
+  });
 
-document.addEventListener("mouseup", (e) => {
-  if (document.activeElement.id !== "awesomebar") {
-    return true;
-  }
-  e.stopPropagation();
-  checkCaretChange();
-  let sel = document.getSelection();
-  let range = sel.getRangeAt(0);
-  if (range.isCollapsed === true) {
-    caretPosition = caretTracker.start;
-    setCaretPosition();
-  }
-});
+  document.addEventListener("selectionchange", (e) => {
+    if (document.activeElement.id !== "awesomebar") {
+      return true;
+    }
+    // console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
+    checkCaretChange();
+  });
 
-document.addEventListener("selectionchange", (e) => {
-  if (document.activeElement.id !== "awesomebar") {
-    return true;
-  }
-  // console.log(`Selection change: will now check cursor position, '${bar.textContent}'`);
-  checkCaretChange();
-});
+  const specialKeys = new Set([
+    "Tab", "Enter", "Escape", "ArrowDown", "ArrowUp"
+  ]);
 
-const specialKeys = new Set([
-  "Tab", "Enter", "Escape", "ArrowDown", "ArrowUp"
-]);
-
-function keyDownListener(e) {
-  if (document.activeElement.id !== "awesomebar") {
-    return true;
+  function keyDownListener(e) {
+    if (document.activeElement.id !== "awesomebar") {
+      return true;
+    }
+    if (specialKeys.has(e.key)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (inputMachine_state !== STATE_READY) {
+        console.log(`keyDownListener: inputMachine_state is ${inputMachine_state}; ${e.key} pressed; stacking it.`);
+        eventStack.push(() => keyDownListener(e));
+        return;
+      }
+      console.log(`keyDownListener: handling ${e.key} keydown.`);
+      inputMachine_state = STATE_AWAITING_ELM;
+      app.ports.sendSpecial.send(e.key);
+    }
   }
-  if (specialKeys.has(e.key)) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (inputMachine_state !== STATE_READY) {
-      console.log(`keyDownListener: inputMachine_state is ${inputMachine_state}; ${e.key} pressed; stacking it.`);
-      eventStack.push(() => keyDownListener(e));
+
+  document.addEventListener("keydown", keyDownListener);
+
+  function userTextLength() {
+    var char_count = 0;
+    for (var current = bar.firstChild; current; current = current.nextSibling) {
+      //console.log(`userTextLength, looking at:`, current, `, char_count=${char_count}`);
+      char_count += current.textContent.length;
+      if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+        char_count -= parseInt(current.dataset.completionlen);
+      }
+    }
+    //console.log(`userTextLength, final count ${char_count}`);
+    return char_count;
+  }
+
+  function countForwardsTo(char_count) {
+    for (var current = bar.firstChild; current; current = current.nextSibling) {
+      //console.log(`countForwardsTo, counting:`, current);
+      var len = current.textContent.length;
+      if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+        len -= parseInt(current.dataset.completionlen);
+      }
+      if (char_count - len <= 0) {
+        return { node: current, offset: char_count };
+      }
+      char_count -= len;
+    }
+    return { bar, char_count };
+  }
+
+  function setCaretPosition() {
+    if (inputMachine_state !== STATE_AWAITING_DOM) {
+      console.log(`setCaretPosition: inputMachine_state is ${inputMachine_state}, returning.`);
       return;
     }
-    console.log(`keyDownListener: handling ${e.key} keydown.`);
-    inputMachine_state = STATE_AWAITING_ELM;
-    app.ports.sendSpecial.send(e.key);
-  }
-}
-
-document.addEventListener("keydown", keyDownListener);
-
-function userTextLength() {
-  var char_count = 0;
-  for (var current = bar.firstChild; current; current = current.nextSibling) {
-    //console.log(`userTextLength, looking at:`, current, `, char_count=${char_count}`);
-    char_count += current.textContent.length;
-    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
-      char_count -= parseInt(current.dataset.completionlen);
+    if (awaiting_timeout_id >= 0) {
+      clearTimeout(awaiting_timeout_id);
+      awaiting_timeout_id = -1;
     }
-  }
-  //console.log(`userTextLength, final count ${char_count}`);
-  return char_count;
-}
-
-function countForwardsTo(char_count) {
-  for (var current = bar.firstChild; current; current = current.nextSibling) {
-    //console.log(`countForwardsTo, counting:`, current);
-    var len = current.textContent.length;
-    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
-      len -= parseInt(current.dataset.completionlen);
-    }
-    if (char_count - len <= 0) {
-      return { node: current, offset: char_count };
-    }
-    char_count -= len;
-  }
-  return { bar, char_count };
-}
-
-function setCaretPosition() {
-  if (inputMachine_state !== STATE_AWAITING_DOM) {
-    console.log(`setCaretPosition: inputMachine_state is ${inputMachine_state}, returning.`);
-    return;
-  }
-  if (awaiting_timeout_id >= 0) {
-    clearTimeout(awaiting_timeout_id);
-    awaiting_timeout_id = -1;
-  }
-  //console.log(`Setting caret position to ${caretPosition}`);
-  let s = document.getSelection();
-  let totalLen = userTextLength();
-  let { node, offset } = countForwardsTo(Math.min(totalLen, caretPosition));
-  let r = document.createRange();
-  if (node !== undefined) {
-    r.setStart(textNodeIn(node), offset);
-    s.removeAllRanges();
-    s.addRange(r);
-    s.collapseToStart();
-  } else {
-    console.log("setCaretPosition: node undefined, ignoring.");
-  }
-  // caretTracker = { start: caretPosition, end: caretPosition };
-  inputMachine_state = STATE_READY; // and that should be a wrap, folks.
-  //console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
-  if (eventStack.length > 0) {
-    console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
-    eventStack.shift()();
-  }
-
-}
-
-function countBackwardsFrom(node, char_count) {
-  for (var current = node; current; current = current.previousSibling) {
-    //console.log(`countBackwardsFrom, looking at `, current);
-    char_count += current.textContent.length;
-    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
-      char_count -= parseInt(current.dataset.completionlen);
-    }
-  }
-  return char_count;
-}
-
-function countNodesForwards(node, count) {
-  var char_count = 0;
-  for (var i = 0, current = node.firstChild; i < count && current; i++, current = current.nextSibling) {
-    char_count += current.textContent.length;
-    if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
-      char_count -= parseInt(current.dataset.completionlen);
-    }
-  }
-  console.log(`countNodesForwards, final count ${char_count}`);
-  return char_count;
-}
-
-function getCaretPosition(selection, getNode, getOffset) {
-  // right!
-  // Now, the focusNode can be a few things:
-  // 1. A text node
-  // 2. A span node
-  // 3. The awesomebar itself
-  // 4. The awesomebar-container
-  // We'll handle each of these cases in turn.
-  let node = getNode(selection);
-  let offset = getOffset(selection);
-  if (node.nodeType === Node.TEXT_NODE) {
-    // Two cases here:
-    // 1. It might be a text-node within a <span>
-    // 2. It might be a text-node within the awesomebar itself
-    if (node.parentNode.tagName === "SPAN") {
-      // Case 1: Get the parent of this, and work backwards from it.
-      return countBackwardsFrom(node.parentNode.previousSibling, offset);
+    //console.log(`Setting caret position to ${caretPosition}`);
+    let s = document.getSelection();
+    let totalLen = userTextLength();
+    let { node, offset } = countForwardsTo(Math.min(totalLen, caretPosition));
+    let r = document.createRange();
+    if (node !== undefined) {
+      r.setStart(textNodeIn(node), offset);
+      s.removeAllRanges();
+      s.addRange(r);
+      s.collapseToStart();
     } else {
-      // Case 2: Work backwards from previous nodes within the awesomebar.
-      return countBackwardsFrom(node.previousSibling, offset);
+      console.log("setCaretPosition: node undefined, ignoring.");
+    }
+    // caretTracker = { start: caretPosition, end: caretPosition };
+    inputMachine_state = STATE_READY; // and that should be a wrap, folks.
+    //console.log(`EVENT COMPLETE.  Text is now: '${bar.textContent}'.`);
+    if (eventStack.length > 0) {
+      console.log(`setCaretPosition: eventStack has ${eventStack.length} events, popping one off.`);
+      eventStack.shift()();
+    }
+
+  }
+
+  function countBackwardsFrom(node, char_count) {
+    for (var current = node; current; current = current.previousSibling) {
+      //console.log(`countBackwardsFrom, looking at `, current);
+      char_count += current.textContent.length;
+      if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+        char_count -= parseInt(current.dataset.completionlen);
+      }
+    }
+    return char_count;
+  }
+
+  function countNodesForwards(node, count) {
+    var char_count = 0;
+    for (var i = 0, current = node.firstChild; i < count && current; i++, current = current.nextSibling) {
+      char_count += current.textContent.length;
+      if (current.nodeType === Node.ELEMENT_NODE && current.dataset.completionlen !== undefined) {
+        char_count -= parseInt(current.dataset.completionlen);
+      }
+    }
+    console.log(`countNodesForwards, final count ${char_count}`);
+    return char_count;
+  }
+
+  function getCaretPosition(selection, getNode, getOffset) {
+    // right!
+    // Now, the focusNode can be a few things:
+    // 1. A text node
+    // 2. A span node
+    // 3. The awesomebar itself
+    // 4. The awesomebar-container
+    // We'll handle each of these cases in turn.
+    let node = getNode(selection);
+    let offset = getOffset(selection);
+    if (node.nodeType === Node.TEXT_NODE) {
+      // Two cases here:
+      // 1. It might be a text-node within a <span>
+      // 2. It might be a text-node within the awesomebar itself
+      if (node.parentNode.tagName === "SPAN") {
+        // Case 1: Get the parent of this, and work backwards from it.
+        return countBackwardsFrom(node.parentNode.previousSibling, offset);
+      } else {
+        // Case 2: Work backwards from previous nodes within the awesomebar.
+        return countBackwardsFrom(node.previousSibling, offset);
+      }
+    }
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
+      return countBackwardsFrom(node.previousSibling, 0);
+    }
+    // for cases #3 & #4, count `offset` nodes forward.
+    if (node.id === "awesomebar") {
+      return countNodesForwards(bar, offset);
+    }
+    console.log(`ERROR in getCaretPosition?? I don't know what to do with this node👇`);
+    console.log(node);
+    return null;
+    //return countBackwardsFrom(bar.lastChild ? bar.lastChild.previousSibling : null, 0);
+  }
+  // We have one of these cases:
+  // div#awesomebar span > text
+  // OR
+  // div#awesomebar > text
+  function getCaretPositions() {
+    // console.log(`Updating caret position, '${bar.textContent}'`);
+    if (document.activeElement.id !== "awesomebar") {
+      console.log("Active element is NOT the awesomebar, it is 👇");
+      console.log(document.activeElement);
+      return null;
+    }
+    let selection = window.getSelection();
+    if (selection.isCollapsed) {
+      let v = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
+      return { start: v, end: v };
+    }
+    let a = getCaretPosition(selection, (sel) => sel.anchorNode, (sel) => sel.anchorOffset);
+    let b = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
+    return { start: Math.min(a, b), end: Math.max(a, b) };
+  }
+
+  function checkCaretChange() {
+    if (bar === null || inputMachine_state !== STATE_READY) {
+      return;
+    }
+    //console.log(`checkCaretChange: caretTracker is initially (${caretTracker.start}, ${caretTracker.end})`);
+    let old = caretTracker;
+    let tmp = getCaretPositions();
+    if (tmp) {
+      caretTracker = tmp;
+      //console.log(`checkCaretChange: caretTracker is now (${caretTracker.start}, ${caretTracker.end})`);
+      // console.log(caretTracker);
+      if (old != caretTracker && caretTracker.start === caretTracker.end) {
+        app.ports.caretMoved.send(caretTracker);
+      }
     }
   }
-  if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN") {
-    return countBackwardsFrom(node.previousSibling, 0);
+
+  function trackCompositionStart(e) {
+    // console.log("Composition started.");
+    isComposing = true;
+    lastInputEvent_range = caretTracker;
   }
-  // for cases #3 & #4, count `offset` nodes forward.
-  if (node.id === "awesomebar") {
-    return countNodesForwards(bar, offset);
+
+  function trackCompositionEnd(e) {
+    // console.log("Composition ended.");
+    isComposing = false;
+    if (lastInputEvent === null) { // can happen if canceled
+      lastInputEvent_range = null;
+      return;
+    }
+    beforeInputListener(lastInputEvent);
+    lastInputEvent = null;
+    lastInputEvent_range = null;
   }
-  console.log(`ERROR in getCaretPosition?? I don't know what to do with this node👇`);
-  console.log(node);
-  return null;
-  //return countBackwardsFrom(bar.lastChild ? bar.lastChild.previousSibling : null, 0);
-}
-// We have one of these cases:
-// div#awesomebar span > text
-// OR
-// div#awesomebar > text
-function getCaretPositions() {
-  // console.log(`Updating caret position, '${bar.textContent}'`);
-  if (document.activeElement.id !== "awesomebar") {
-    console.log("Active element is NOT the awesomebar, it is 👇");
-    console.log(document.activeElement);
+
+  function beforeInputListener(event) {
+    event.stopPropagation();
+    if (event.inputType.match("^history..do")) {
+      return; // don't handle this.
+    }
+    if (isComposing) {
+      // console.log(`Got ${event.inputType} but still composing.`);
+      lastInputEvent = event;
+      inputMachine_state = STATE_READY;
+      return; // let the composition continue; come back when it's done.
+    }
+    if (event.inputType.match("^(insert|delete).*")) {
+      // I have to `preventDefault` here because Elm won't handle the actual event.
+      // That is because the actual event doesn't contain caret position;
+      // I have to synthesise that information & send it through.
+      // 
+      // It will be notified about its characteristics instead.
+      event.preventDefault();
+      // if we don't preventDefault BEFORE we check the state machine, then there
+      // is a chance that the DOM will update with this character on insert, which
+      // will duplicate a character out-of-order.
+    }
+    if (inputMachine_state !== STATE_READY) {
+      console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event (≈'${event.data}') to stack.`);
+      eventStack.push(() => beforeInputListener(event));
+      return;
+    }
+    console.log(`beforeInputListener: handling event (≈'${event.data}')`);
+    // console.log(event);
+    if (event.inputType === "insertReplacementText") {
+      const replacement = event.dataTransfer.getData("text");
+      const range = event.getTargetRanges()[0];
+      // Now tell Elm about it.
+      // console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
+      let packaged =
+        { inputType: event.inputType
+          , data: replacement
+          , start: range.startOffset
+          , end: range.endOffset
+        };
+      // console.log(packaged);
+      inputMachine_state = STATE_AWAITING_ELM;
+      app.ports.awesomeBarInput.send(packaged);
+    } else {
+      // Here I need to get the selection position as well.
+      // If we're in 'beforeinput', then we can assume focus??
+      // I'm not 100% sure, but I don't see how it can be false
+      // (barring programmatic input), so the temptation is to go with it…
+      // But hey, what can I say, I'm a safety girl!
+      // bar.focus();
+      [ start, end ] =
+        (() => {
+          if (lastInputEvent_range) {
+            return [ lastInputEvent_range.start, lastInputEvent_range.end ];
+          } else {
+            // const range = window.getSelection().getRangeAt(0);
+            // const preSelectionRange = range.cloneRange();
+            // preSelectionRange.selectNodeContents(bar);
+            // preSelectionRange.setEnd(range.startContainer, range.startOffset);
+            // const start = preSelectionRange.toString().length;
+            // const end = start + range.toString().length;
+            // return [ start, end ];
+            return [ caretTracker.start, caretTracker.end ];
+          }
+        })();
+      // unless there is an ACTUAL selection, `start` and `end` should be the same.
+      // Now tell Elm about it.
+      // console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
+      let packaged =
+        { inputType: event.inputType
+          , data: event.inputType === "insertFromPaste"
+              ? event.dataTransfer.getData("text")
+              : event.data ?? ""
+          , start: start
+          , end: end
+        };
+      //console.log(JSON.stringify(packaged));
+      inputMachine_state = STATE_AWAITING_ELM;
+      app.ports.awesomeBarInput.send(packaged);
+    }
+  }
+
+  function textNodeIn(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      //console.log(`Returning node ${node} with nodeType ${node.nodeType}, wanted ${Node.TEXT_NODE}`);
+      return node;
+    }
+    var stack = [node];
+    while (stack.length > 0) {
+      //console.log(`textNodeIn, stack=`, stack);
+      var current = stack.pop();
+      for (var i = 0; i < current.childNodes.length; i++) {
+        if (current.childNodes[i].nodeType === Node.TEXT_NODE) {
+          //console.log(`Returning node ${current.childNodes[i]} with nodeType ${current.childNodes[i].nodeType} (wanted ${Node.TEXT_NODE})`);
+          return current.childNodes[i];
+        } else {
+          stack.push(current.childNodes[i]);
+        }
+      }
+    }
+    console.log("textNodeIn(…): Nothing, null'ing out.");
     return null;
   }
-  let selection = window.getSelection();
-  if (selection.isCollapsed) {
-    let v = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
-    return { start: v, end: v };
-  }
-  let a = getCaretPosition(selection, (sel) => sel.anchorNode, (sel) => sel.anchorOffset);
-  let b = getCaretPosition(selection, (sel) => sel.focusNode, (sel) => sel.focusOffset);
-  return { start: Math.min(a, b), end: Math.max(a, b) };
-}
 
-function checkCaretChange() {
-  if (bar === null || inputMachine_state !== STATE_READY) {
-    return;
-  }
-  //console.log(`checkCaretChange: caretTracker is initially (${caretTracker.start}, ${caretTracker.end})`);
-  let old = caretTracker;
-  let tmp = getCaretPositions();
-  if (tmp) {
-    caretTracker = tmp;
-    //console.log(`checkCaretChange: caretTracker is now (${caretTracker.start}, ${caretTracker.end})`);
-    // console.log(caretTracker);
-    if (old != caretTracker && caretTracker.start === caretTracker.end) {
-      app.ports.caretMoved.send(caretTracker);
-    }
-  }
-}
-
-function trackCompositionStart(e) {
-  // console.log("Composition started.");
-  isComposing = true;
-  lastInputEvent_range = caretTracker;
-}
-
-function trackCompositionEnd(e) {
-  // console.log("Composition ended.");
-  isComposing = false;
-  if (lastInputEvent === null) { // can happen if canceled
-    lastInputEvent_range = null;
-    return;
-  }
-  beforeInputListener(lastInputEvent);
-  lastInputEvent = null;
-  lastInputEvent_range = null;
-}
-
-function beforeInputListener(event) {
-  event.stopPropagation();
-  if (event.inputType.match("^history..do")) {
-    return; // don't handle this.
-  }
-  if (isComposing) {
-    // console.log(`Got ${event.inputType} but still composing.`);
-    lastInputEvent = event;
-    inputMachine_state = STATE_READY;
-    return; // let the composition continue; come back when it's done.
-  }
-  if (event.inputType.match("^(insert|delete).*")) {
-    // I have to `preventDefault` here because Elm won't handle the actual event.
-    // That is because the actual event doesn't contain caret position;
-    // I have to synthesise that information & send it through.
-    // 
-    // It will be notified about its characteristics instead.
-    event.preventDefault();
-    // if we don't preventDefault BEFORE we check the state machine, then there
-    // is a chance that the DOM will update with this character on insert, which
-    // will duplicate a character out-of-order.
-  }
-  if (inputMachine_state !== STATE_READY) {
-    console.log(`beforeInputListener: inputMachine_state is ${inputMachine_state}, pushing event (≈'${event.data}') to stack.`);
-    eventStack.push(() => beforeInputListener(event));
-    return;
-  }
-  console.log(`beforeInputListener: handling event (≈'${event.data}')`);
-  // console.log(event);
-  if (event.inputType === "insertReplacementText") {
-    const replacement = event.dataTransfer.getData("text");
-    const range = event.getTargetRanges()[0];
-    // Now tell Elm about it.
-    // console.log(`Input type: ${event.inputType}.  Start=${range.startOffset}, End=${range.endOffset}.`);
-    let packaged =
-      { inputType: event.inputType
-        , data: replacement
-        , start: range.startOffset
-        , end: range.endOffset
-      };
-    // console.log(packaged);
-    inputMachine_state = STATE_AWAITING_ELM;
-    app.ports.awesomeBarInput.send(packaged);
-  } else {
-    // Here I need to get the selection position as well.
-    // If we're in 'beforeinput', then we can assume focus??
-    // I'm not 100% sure, but I don't see how it can be false
-    // (barring programmatic input), so the temptation is to go with it…
-    // But hey, what can I say, I'm a safety girl!
-    // bar.focus();
-    [ start, end ] =
-      (() => {
-        if (lastInputEvent_range) {
-          return [ lastInputEvent_range.start, lastInputEvent_range.end ];
-        } else {
-          // const range = window.getSelection().getRangeAt(0);
-          // const preSelectionRange = range.cloneRange();
-          // preSelectionRange.selectNodeContents(bar);
-          // preSelectionRange.setEnd(range.startContainer, range.startOffset);
-          // const start = preSelectionRange.toString().length;
-          // const end = start + range.toString().length;
-          // return [ start, end ];
-          return [ caretTracker.start, caretTracker.end ];
-        }
-      })();
-    // unless there is an ACTUAL selection, `start` and `end` should be the same.
-    // Now tell Elm about it.
-    // console.log(`Input type: ${event.inputType}.  Start=${start}, End=${end}.`);
-    let packaged =
-      { inputType: event.inputType
-        , data: event.inputType === "insertFromPaste"
-            ? event.dataTransfer.getData("text")
-            : event.data ?? ""
-        , start: start
-        , end: end
-      };
-    //console.log(JSON.stringify(packaged));
-    inputMachine_state = STATE_AWAITING_ELM;
-    app.ports.awesomeBarInput.send(packaged);
-  }
-}
-
-function textNodeIn(node) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    //console.log(`Returning node ${node} with nodeType ${node.nodeType}, wanted ${Node.TEXT_NODE}`);
-    return node;
-  }
-  var stack = [node];
-  while (stack.length > 0) {
-    //console.log(`textNodeIn, stack=`, stack);
-    var current = stack.pop();
-    for (var i = 0; i < current.childNodes.length; i++) {
-      if (current.childNodes[i].nodeType === Node.TEXT_NODE) {
-        //console.log(`Returning node ${current.childNodes[i]} with nodeType ${current.childNodes[i].nodeType} (wanted ${Node.TEXT_NODE})`);
-        return current.childNodes[i];
-      } else {
-        stack.push(current.childNodes[i]);
+  // Callback function to execute when mutations are observed
+  const observation = (mutationList, _observer) => {
+    for (const mutation of mutationList) {
+      //console.log(mutation);
+      const arr = Array.from(mutation.addedNodes);
+      if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
+        // console.log(`A child node has been added or removed within ${mutation.target.id}`);
+        // console.log(mutation.removedNodes);
+        // console.log(mutation.addedNodes);
+        // setCaretPosition(textNodeIn(mutation.addedNodes[0]));
+        setCaretPosition();
+        return;
+      }
+      if (mutation.type == "characterData") {
+        // console.log(`Character data has changed within ${mutation.target.parentNode.tagName} ${mutation.target.parentNode.id}, now '${mutation.target.textContent}'`);
+        setCaretPosition();
+        return;
       }
     }
-  }
-  console.log("textNodeIn(…): Nothing, null'ing out.");
-  return null;
-}
+  };
 
-// Callback function to execute when mutations are observed
-const observation = (mutationList, _observer) => {
-  for (const mutation of mutationList) {
-    //console.log(mutation);
-    const arr = Array.from(mutation.addedNodes);
-    if (mutation.type === "childList" && arr.length > 0 && mutation.target.id === "awesomebar") {
-      // console.log(`A child node has been added or removed within ${mutation.target.id}`);
-      // console.log(mutation.removedNodes);
-      // console.log(mutation.addedNodes);
-      // setCaretPosition(textNodeIn(mutation.addedNodes[0]));
-      setCaretPosition();
+  // Create an observer instance linked to the callback function
+  const observer = new MutationObserver(observation);
+
+  function goodbyeBar() {
+    bar.removeEventListener("beforeinput", beforeInputListener);
+    bar.removeEventListener("compositionstart", trackCompositionStart);
+    bar.removeEventListener("compositionend", trackCompositionEnd);
+    observer.disconnect();
+    // reset all the state-tracking variables
+    textRange = null;
+    bar = null;
+    isComposing = false;
+    caretPosition = 0;
+    lastInputEvent = null;
+    caretTracker = { start: 0, end: 0 };
+    // Tell Elm that it can now get rid of the element
+    app.ports.listenerRemoved.send(null);
+    if (awaiting_timeout_id >= 0) {
+      clearTimeout(awaiting_timeout_id);
+      awaiting_timeout_id = -1;
+    }
+  }
+
+  function initializeBar() {
+    bar = document.getElementById("awesomebar");
+    if (!bar) {
+      setTimeout(initializeBar, 50);
       return;
     }
-    if (mutation.type == "characterData") {
-      // console.log(`Character data has changed within ${mutation.target.parentNode.tagName} ${mutation.target.parentNode.id}, now '${mutation.target.textContent}'`);
-      setCaretPosition();
-      return;
-    }
-  }
-};
+    bar.addEventListener("beforeinput", beforeInputListener);
+    bar.addEventListener("compositionstart", trackCompositionStart);
+    bar.addEventListener("compositionend", trackCompositionEnd);
+    bar.focus();
 
-// Create an observer instance linked to the callback function
-const observer = new MutationObserver(observation);
-
-function goodbyeBar() {
-  bar.removeEventListener("beforeinput", beforeInputListener);
-  bar.removeEventListener("compositionstart", trackCompositionStart);
-  bar.removeEventListener("compositionend", trackCompositionEnd);
-  observer.disconnect();
-  // reset all the state-tracking variables
-  textRange = null;
-  bar = null;
-  isComposing = false;
-  caretPosition = 0;
-  lastInputEvent = null;
-  caretTracker = { start: 0, end: 0 };
-  // Tell Elm that it can now get rid of the element
-  app.ports.listenerRemoved.send(null);
-  if (awaiting_timeout_id >= 0) {
-    clearTimeout(awaiting_timeout_id);
-    awaiting_timeout_id = -1;
-  }
-}
-
-function initializeBar() {
-  bar = document.getElementById("awesomebar");
-  if (!bar) {
-    setTimeout(initializeBar, 50);
-    return;
-  }
-  bar.addEventListener("beforeinput", beforeInputListener);
-  bar.addEventListener("compositionstart", trackCompositionStart);
-  bar.addEventListener("compositionend", trackCompositionEnd);
-  bar.focus();
-
-  // Start observing the target node for configured mutations
-  observer.observe(bar, { characterData: true, childList: true, subtree: true });
-  inputMachine_state = STATE_READY;
-}
-
-app.ports.displayAwesomeBar.subscribe(initializeBar);
-app.ports.hideAwesomeBar.subscribe(goodbyeBar);
-app.ports.noActionPerformed.subscribe(() => {
-  if (inputMachine_state === STATE_AWAITING_ELM) {
-    console.log("No action necessary, resetting inputMachine_state to STATE_READY.");
+    // Start observing the target node for configured mutations
+    observer.observe(bar, { characterData: true, childList: true, subtree: true });
     inputMachine_state = STATE_READY;
-  } else {
-    console.log(`inputMachine_state is too late to stop; how did we get here? (value = {inputMachine_state}).`);
   }
-});
 
-app.ports.shiftCaret.subscribe((p) => {
-  if (inputMachine_state !== STATE_AWAITING_ELM) {
-    console.log(`Shift-caret(${p}) message received, but inputMachine_state is ${inputMachine_state}`);
-    return;
-  }
-  // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
-  inputMachine_state = STATE_AWAITING_DOM;
-  //console.log(`Elm says: caret position should be set to ${p}`);
-  awaiting_timeout_id =
-    setTimeout(() =>
-      { awaiting_timeout_id = -1;
-        console.log("Calling setCaretPosition() out of sheer desperation.");
-        setCaretPosition();
-      }, 50
-    );
-  // const totalLen = userTextLength();
-  caretPosition = p;
-  caretTracker = { start: caretPosition, end: caretPosition };
-  // if (totalLen >= p) {
-  //   // go ahead & invoke now.
-  //   setCaretPosition();
-  // }
-});
+  app.ports.displayAwesomeBar.subscribe(initializeBar);
+  app.ports.hideAwesomeBar.subscribe(goodbyeBar);
+  app.ports.noActionPerformed.subscribe(() => {
+    if (inputMachine_state === STATE_AWAITING_ELM) {
+      console.log("No action necessary, resetting inputMachine_state to STATE_READY.");
+      inputMachine_state = STATE_READY;
+    } else {
+      console.log(`inputMachine_state is too late to stop; how did we get here? (value = {inputMachine_state}).`);
+    }
+  });
+
+  app.ports.shiftCaret.subscribe((p) => {
+    if (inputMachine_state !== STATE_AWAITING_ELM) {
+      console.log(`Shift-caret(${p}) message received, but inputMachine_state is ${inputMachine_state}`);
+      return;
+    }
+    // console.log(`Shift-caret(${p}) message received, text content is '${bar.textContent}'`);
+    inputMachine_state = STATE_AWAITING_DOM;
+    //console.log(`Elm says: caret position should be set to ${p}`);
+    awaiting_timeout_id =
+      setTimeout(() =>
+        { awaiting_timeout_id = -1;
+          console.log("Calling setCaretPosition() out of sheer desperation.");
+          setCaretPosition();
+        }, 50
+      );
+    // const totalLen = userTextLength();
+    caretPosition = p;
+    caretTracker = { start: caretPosition, end: caretPosition };
+    // if (totalLen >= p) {
+    //   // go ahead & invoke now.
+    //   setCaretPosition();
+    // }
+  });
+};

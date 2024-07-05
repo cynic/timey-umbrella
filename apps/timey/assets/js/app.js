@@ -1,7 +1,5 @@
 // import the compiled Elm app, with accompanying essential JavaScript:
-if (!!document.getElementById("elm-app")) {
-  import('./main.js')
-}
+import { start_elm } from './main.js'
 // import the other JS files:
 // import './debug.js';
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`
@@ -48,3 +46,11 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+
+function setup_channels(elm_app) {
+  console.log("Setup-channels stub");
+}
+
+window.start_elm = function (flags) {
+  start_elm(flags, setup_channels)
+};

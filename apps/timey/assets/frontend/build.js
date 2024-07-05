@@ -8,6 +8,7 @@ async function watch() {
     entryPoints: ['main.js', 'debug.js'],
     bundle: true,
     outdir: '../js',
+    format: 'esm',
     plugins: [
       ElmPlugin({
         debug: true
@@ -22,6 +23,7 @@ async function build() {
   await esbuild.build({
     entryPoints: ['main.js'],
     bundle: true,
+    format: 'esm',
     minify: true,
     outdir: '../js',
     plugins: [
