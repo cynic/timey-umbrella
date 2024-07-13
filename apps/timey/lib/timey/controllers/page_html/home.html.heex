@@ -3,7 +3,7 @@
   <div id="elm-app"></div>
   <script>
     document.addEventListener("DOMContentLoaded", function(){
-      start_elm(null);
+      start_elm({channel_token: "<%= assigns[:user_token] %>", email: "<%= assigns[:email] %>" });
     });
   </script>
 </div>
