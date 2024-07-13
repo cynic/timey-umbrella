@@ -10,7 +10,7 @@ defmodule Timey.UserAuth do
   # If you want bump or reduce this value, also change
   # the token expiry itself in UserToken.
   @max_age 60 * 60 * 24 * 60
-  @remember_me_cookie "_timey_web_user_remember_me"
+  @remember_me_cookie "_timey_user_remember_me"
   @remember_me_options [sign: true, max_age: @max_age, same_site: "Lax"]
 
   @doc """
@@ -130,16 +130,16 @@ defmodule Timey.UserAuth do
   Use the `on_mount` lifecycle macro in LiveViews to mount or authenticate
   the current_user:
 
-      defmodule TimeyWeb.PageLive do
-        use TimeyWeb, :live_view
+      defmodule Timey.PageLive do
+        use Timey, :live_view
 
-        on_mount {TimeyWeb.UserAuth, :mount_current_user}
+        on_mount {Timey.UserAuth, :mount_current_user}
         ...
       end
 
   Or use the `live_session` of your router to invoke the on_mount callback:
 
-      live_session :authenticated, on_mount: [{TimeyWeb.UserAuth, :ensure_authenticated}] do
+      live_session :authenticated, on_mount: [{Timey.UserAuth, :ensure_authenticated}] do
         live "/profile", ProfileLive, :index
       end
   """
