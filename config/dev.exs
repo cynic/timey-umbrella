@@ -30,7 +30,7 @@ config :timey, Timey.Endpoint,
     node: ["./build.js", "--watch", cd: Path.expand("../apps/timey/assets/frontend", __DIR__)]
   ]
 
-config :id_prefix_app, IdPrefixApp.Base36Generator,
+config :id_prefix_app, IdPrefixApp.PrefixGenerator,
   code_reloader: true
 
 # ## SSL Support

@@ -1,9 +1,11 @@
 <.flash_group flash={@flash} />
 <div id="elm-app-container">
+  <div><%= assigns[:prefix] %></div>
   <div id="elm-app"></div>
   <script>
     document.addEventListener("DOMContentLoaded", function(){
-      start_elm({channel_token: "<%= assigns[:user_token] %>", email: "<%= assigns[:email] %>" });
+      <%# start_elm({channel_token: "<%= assigns[:user_token] %>", email: "<%= assigns[:email] %>" }); %>
+      start_elm({channel_token: "<%= assigns[:user_token] %>", prefix: "<%= assigns[:prefix] %>" });
     });
   </script>
 </div>

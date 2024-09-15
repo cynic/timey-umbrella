@@ -26,12 +26,19 @@ defmodule Timey.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(%{"token" => token}, socket, _connect_info) do
+  def connect(%{"token" => token, "prefix" => prefix}, socket, _connect_info) do
     case Phoenix.Token.verify(socket, "ZDtplvkLkLh8@NPwtH^qjifVyKkh9&zDhO8ervm3#ERag", token, max_age: 1_209_600) do
       {:ok, user_id} ->
         Logger.info("verified user with id #{user_id}")
-        user = SqlDb.Accounts.get_user!(user_id)
-        {:ok, assign(assign(socket, :user_email, user.email), :user_id, user_id)}
+        # user = SqlDb.Accounts.get_user!(user_id)
+        # {:ok, assign(socket, :user_email, user.email) |> assign(:user_id, user_id)}
+        case IdPrefixApp.mark_active(prefix) do
+          :ok ->
+            {:ok, assign(socket, :prefix, prefix) |> assign(:user_id, user_id)}
+          {:error, reason} ->
+            Logger.error("could not set active prefix #{prefix} for user #{user_id}: #{reason}")
+            :error
+        end
       {:error, _reason} ->
         :error
     end

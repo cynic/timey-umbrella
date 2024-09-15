@@ -46,9 +46,9 @@ liveSocket.connect()
 window.liveSocket = liveSocket
 
 
-const setup_channels = (channel_token, email) => elm_app => {
+const setup_channels = (channel_token, prefix) => elm_app => {
   console.log("Setting up channels");
-  let socket = new Socket("/socket", {params: {token: channel_token}});
+  let socket = new Socket("/socket", {params: {token: channel_token, prefix: prefix}});
 
   // When you connect, you'll often need to authenticate the client.
   // For example, imagine you have an authentication plug, `MyAuth`,
@@ -96,12 +96,12 @@ const setup_channels = (channel_token, email) => elm_app => {
   socket.connect()
 
   // Now that you are connected, you can join channels with a topic & subtopic.
-  let channel = socket.channel(`tcpish:${email}`, {})
+  let channel = socket.channel(`tcpish:${prefix}`, {})
   channel.join()
     .receive("ok", resp => { console.log("Joined successfully", resp) })
     .receive("error", resp => { console.log("Unable to join", resp) })
 };
 
 window.start_elm = function (flags) {
-  start_elm(flags, setup_channels(flags.channel_token, flags.email))
+  start_elm(flags, setup_channels(flags.channel_token, flags.prefix))
 };

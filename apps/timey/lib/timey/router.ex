@@ -89,19 +89,19 @@ defmodule Timey.Router do
 
   scope "/test", Timey do
     pipe_through [:api, :require_authenticated_user]
-    get "/", WhatsUpDoc, :funkSoulBrother
+    # get "/", WhatsUpDoc, :funkSoulBrother
   end
 
 end
 
-defmodule Timey.WhatsUpDoc do
-  use Timey, :controller
-  def funkSoulBrother(conn, _params) do
-    if conn.assigns[:conn_id] do
-      Phoenix.Controller.json(conn, %{out: conn.assigns[:conn_id]})
-    else
-      id = IdPrefixApp.Base36Generator.get_id()
-      Phoenix.Controller.json(conn.assign(:conn_id, id), %{out: id})
-    end
-  end
-end
+# defmodule Timey.WhatsUpDoc do
+#   use Timey, :controller
+#   def funkSoulBrother(conn, _params) do
+#     if conn.assigns[:conn_id] do
+#       Phoenix.Controller.json(conn, %{out: conn.assigns[:conn_id]})
+#     else
+#       id = IdPrefixApp.PrefixGenerator.get_id()
+#       Phoenix.Controller.json(conn.assign(:conn_id, id), %{out: id})
+#     end
+#   end
+# end
