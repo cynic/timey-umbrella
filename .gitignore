@@ -1,6 +1,8 @@
 elm-stuff
 node_modules
 .elixir_ls
+.direnv
+_build
 **/assets/js/main.js
 **/assets/js/debug.js
 __pycache__
